@@ -1,3 +1,8 @@
+import xarray as xr
+import numpy as np
+import os, subprocess
+
+
 def compute_ecmwf_pressure_and_height(ds_ml: xr.Dataset, ds_srf: xr.Dataset) -> tuple[xr.DataArray, xr.DataArray]:
     """
     Computes 3D/2D pressure [Pa] and height AGL [m] on ECMWF hybrid model levels

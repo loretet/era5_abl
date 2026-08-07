@@ -1,3 +1,8 @@
+import xarray as xr
+import numpy as np
+from .operations import interpolate_to_height
+
+
 def filter_clouds(ds: xr.Dataset, ds_srf: xr.Dataset, lcc_thresh: float = 0.1, window_hours: int = 2) -> tuple[xr.Dataset, xr.Dataset]:
     """
     Filters input dataset based on Low Cloud Cover. The assumption is that middle to high clouds do

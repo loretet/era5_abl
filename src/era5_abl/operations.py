@@ -1,3 +1,7 @@
+import xarray as xr
+import numpy as np
+
+
 def compute_grad_Ri_z(ds: xr.Dataset) -> xr.Dataset:
     """
     Computes Gradient Richardson Number profiles over non-uniform physical height
