@@ -348,3 +348,32 @@ def compute_fh(fm: xr.DataArray, ds: xr.Dataset, epsilon_t: float) -> xr.DataArr
     fh = np.sqrt(fm) * ((1.0 - bracket) ** (-1.0))
 
     return fh
+
+def compare_diagnosed_and_era5_blh(ds_ml: xr.Dataset, ds_srf: xr.Dataset) -> None:
+    diagnosed = ds_ml["BLH_Ri"]
+    era5 = ds_srf["blh"].sel(
+        time=diagnosed["time"]
+    )
+
+    difference = diagnosed - era5
+
+    print(
+        "Diagnosed BLH quantiles:",
+        diagnosed.quantile(
+            [0.05, 0.5, 0.95]
+        ).values,
+    )
+
+    print(
+        "ERA5 BLH quantiles:",
+        era5.quantile(
+            [0.05, 0.5, 0.95]
+        ).values,
+    )
+
+    print(
+        "Difference quantiles [m]:",
+        difference.quantile(
+            [0.05, 0.5, 0.95]
+        ).values,
+    )
