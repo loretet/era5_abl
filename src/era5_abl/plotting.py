@@ -6,10 +6,17 @@ import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 from .operations import compute_difference_surface_top_ABL, interpolate_to_height
 
+DATASET_STYLES = [
+    {"color": "#1f77b4", "linestyle": "-", "marker": "o"},   
+    {"color": "#ff7f0e", "linestyle": "--", "marker": "s"},  
+    {"color": "#2ca02c", "linestyle": "-.", "marker": "^"}, 
+    {"color": "#d62728", "linestyle": ":", "marker": "D"},   
+]
 
 def plot_in_time(
         ds: xr.Dataset, 
-        var_name: str
+        var_name: str,
+        style: list[dict[str,str]] = DATASET_STYLES
     ):
     """
     Plots vertical profiles of var_name against height AGL (z) across time.
@@ -22,7 +29,7 @@ def plot_in_time(
     fig = plt.figure(figsize=(6, 8))
     for i, t in enumerate(times):
         ds_time = ds.sel({time_dim: t})
-        style = DATASET_STYLES[i % len(DATASET_STYLES)]
+        style = style[i % len(style)]
         lbl = str(t)[:16] if (i == 0 or i == N - 1) else None
         plt.plot(
             ds_time[var_name],
@@ -46,6 +53,7 @@ def plot_abl_top_vs_surface_scatter_contour(
     ds_dict: dict[str, xr.Dataset],
     ds_srf_dict: dict[str, xr.Dataset],
     temp_var: str = "t",
+    style: list[dict[str,str]] = DATASET_STYLES
 ):
     """
     Plots a combined scatter and 2D KDE contour plot of Delta T (ABL Top - Surface)
@@ -55,7 +63,7 @@ def plot_abl_top_vs_surface_scatter_contour(
     fig, ax = plt.subplots(figsize=(9, 7))
 
     for idx, (name, ds) in enumerate(ds_dict.items()):
-        style = DATASET_STYLES[idx % len(DATASET_STYLES)]
+        style = style[idx % len(style)]
         ds_srf = ds_srf_dict[name]
 
         # 1. Compute Temperature Difference (ABL Top - Surface)
@@ -119,6 +127,7 @@ def plot_multi_dataset_pdf(
     var_name: str,
     target_height: float | None = None,
     bins: int = 50,
+    style: list[dict[str,str]] = DATASET_STYLES
 ):
     """
     Plots Probability Density Functions (PDFs) of a specified variable across 4 datasets.
@@ -129,7 +138,7 @@ def plot_multi_dataset_pdf(
     fig, ax = plt.subplots(figsize=(8, 6))
 
     for idx, (name, ds) in enumerate(ds_dict.items()):
-        style = DATASET_STYLES[idx % len(DATASET_STYLES)]
+        style = style[idx % len(style)]
 
         if var_name not in ds:
             raise KeyError(f"Variable '{var_name}' not found in dataset '{name}'.")
@@ -182,7 +191,8 @@ def plot_multi_dataset_pdf(
 
 
 def plot_Ri_vs_stability_function(
-    ds_dict: dict[str, xr.Dataset], func_type: str = "fm"
+    ds_dict: dict[str, xr.Dataset], func_type: str = "fm",
+    style: list[dict[str,str]] = DATASET_STYLES
 ):
     """
     Plots Gradient Richardson Number (Ri_20) on the y-axis against the GL18 stability
@@ -194,7 +204,7 @@ def plot_Ri_vs_stability_function(
     target_var = "fm_20" if func_type == "fm" else "fh_20"
 
     for idx, (name, ds) in enumerate(ds_dict.items()):
-        style = DATASET_STYLES[idx % len(DATASET_STYLES)]
+        style = style[idx % len(style)]
 
         # Extract Ri_20 and stability function arrays
         ri_20 = interpolate_to_height(ds, "Ri_g", None, 20.0).values.flatten()
@@ -236,6 +246,7 @@ def plot_vertical_profile(
     time: str | np.datetime64 | None = None,
     time_range: tuple[str, str] | slice | None = None,
     cmap_name: str = "viridis",
+    style: list[dict[str,str]] = DATASET_STYLES
 ):
     """
     Plots vertical profiles (variable vs. height) across datasets. Either at a specific
@@ -249,7 +260,7 @@ def plot_vertical_profile(
     fig, ax = plt.subplots(figsize=(7, 8))
 
     for idx, (name, ds) in enumerate(ds_dict.items()):
-        style = DATASET_STYLES[idx % len(DATASET_STYLES)]
+        style = style[idx % len(style)]
 
         if var_name not in ds or "z" not in ds:
             raise KeyError(
