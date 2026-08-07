@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "era5-abl"
+version = "0.1.0"
+description = "ERA5 atmospheric boundary-layer diagnostics, filtering, and analysis utilities"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Lorenzo" }
+]
+keywords = [
+    "ERA5",
+    "atmospheric-boundary-layer",
+    "Richardson-number",
+    "boundary-layer-height",
+    "xarray",
+]
+
+dependencies = [
+    "numpy>=1.24",
+    "xarray>=2023.1",
+    "netCDF4>=1.6",
+    "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+plotting = [
+    "seaborn>=0.12",
+]
+test = [
+    "pytest>=7.4",
+]
+dev = [
+    "pytest>=7.4",
+    "ruff>=0.5",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
