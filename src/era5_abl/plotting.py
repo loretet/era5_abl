@@ -6,12 +6,14 @@ import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 from .operations import compute_difference_surface_top_ABL, interpolate_to_height
 
+
 DATASET_STYLES = [
     {"color": "#1f77b4", "linestyle": "-", "marker": "o"},   
     {"color": "#ff7f0e", "linestyle": "--", "marker": "s"},  
     {"color": "#2ca02c", "linestyle": "-.", "marker": "^"}, 
     {"color": "#d62728", "linestyle": ":", "marker": "D"},   
 ]
+
 
 def plot_in_time(
         ds: xr.Dataset, 

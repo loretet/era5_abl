@@ -35,25 +35,11 @@ REFERENCE_HEIGHT = 20.0
 
 #%% Retrieve ERA5 data
 if DATA_RETRIEVAL:
-    for site_name, site in SITE_CONFIGS.items():
-
-        site = get_site_config(site_name)
-
-        retrieve_surface_data(
-            area=site.area,
-            dates=DATES,
-            output_path=str(
-                DATA_DIR / site.surface_filename
-            ),
-        )
-
-        retrieve_model_level_data(
-            area=site.area,
-            dates=DATES,
-            output_path=str(
-                DATA_DIR / site.model_level_filename
-            ),
-        )
+    era.parallel_retrieval(
+        dates=DATES,
+        output_dir=DATA_DIR,
+        max_workers=4,
+    )
 
 # If one only wants one site:
 # site_name = "Mace Head"

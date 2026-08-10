@@ -6,6 +6,12 @@ from .preprocessing import (
     prepare_dataset,
 )
 
+from .data_retrieve import (
+    retrieve_surface_data,
+    retrieve_model_level_data,
+    parallel_retrieval,
+)
+
 from .operations import (
     compute_BLH_from_Ri_b,
     compute_wind_dir,
@@ -50,6 +56,9 @@ __all__ = [
     "compute_zeta_GL18",
     "compute_fm",
     "compute_fh",
-]
+    "retrieve_surface_data",
+    "retrieve_model_level_data",
+    "parallel_retrieval"
+    ]
 
 __version__ = "0.1.0"
