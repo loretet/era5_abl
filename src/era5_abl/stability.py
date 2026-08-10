@@ -1,6 +1,7 @@
 import numpy as np
 import xarray as xr
 from .operations import interpolate_to_height
+from .preprocessing import compute_thetav
 from .config import (
     GRAVITY
 )
@@ -133,6 +134,8 @@ def compute_difference_surface_top_ABL(ds_ml: xr.Dataset, ds_srf: xr.Dataset, va
     # Surface variable
     if var_name == "t":
         surf_var = ds_srf["t2m"] # no proper surface temperature available
+    elif var_name == "theta_v":
+        surf_var = compute_thetav(ds_srf)
     elif var_name == "wind_speed":
         surf_var = interpolate_to_height(ds_ml, var_name, None, 2.0)# wind speed at "surface" (2m)
     else:

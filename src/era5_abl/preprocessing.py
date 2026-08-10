@@ -3,10 +3,9 @@ import numpy as np
 import os, subprocess
 from .config import (
     GRAVITY,
-    DRY_AIR_GAS_CONSTANT,
-    REFERENCE_PRESSURE,
-    POISSON_EXPONENT
+    DRY_AIR_GAS_CONSTANT
 )
+from .operations import compute_thetav
 
 
 def compute_ecmwf_pressure_and_height(ds_ml: xr.Dataset, ds_srf: xr.Dataset) -> tuple[xr.DataArray, xr.DataArray]:
@@ -118,6 +117,7 @@ def standardize_surface_varnames(ds: xr.Dataset) -> xr.Dataset:
         "var187": {"short_name": "mcc", "long_name": "Medium cloud cover"},
         "var159": {"short_name": "blh", "long_name": "Boundary layer height"},
         "var129": {"short_name": "z", "long_name": "Surface geopotential"},
+        "var168": {"short_name": "2d", "long_name": "2 metre dewpoint temperature"},
     }
 
     # Update long_name attributes for present variables prior to renaming
@@ -140,7 +140,6 @@ def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None)
     3D pressure p(t, k) and hydrostatic height z_agl(t, k) from hybrid coefficients,
     derives theta_v, and reverses the vertical axis so k=0 is the surface.
     """
-    P0 = REFERENCE_PRESSURE
 
     # Output paths
     ml_nc_path = grib_ml_path.replace(".grib", "_CDO_processed.nc")
@@ -187,9 +186,9 @@ def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None)
     ds_ml["pressure"] = p_da
     ds_ml = ds_ml.assign_coords(z=(("time", "model_level"), z_agl_da.values))
 
-    # Compute Virtual Potential Temperature 
-    t_v = ds_ml["t"] * (1.0 + 0.608 * ds_ml["q"])
-    ds_ml["theta_v"] = t_v * (P0 / ds_ml["pressure"]) ** POISSON_EXPONENT
+    # Compute virtual potential temperature
+    ds_ml = compute_thetav(ds_ml)
+    ds_srf = compute_thetav(ds_srf)
 
     # Compute wind speed 
     ds_ml["wind_speed"] = np.sqrt(ds_ml["u"]**2 + ds_ml["v"]**2)

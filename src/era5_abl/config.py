@@ -76,6 +76,7 @@ ERA5_SURFACE_VARIABLES = [
     "medium_cloud_cover",
     "boundary_layer_height",
     "geopotential",
+    "2m_dewpoint_temperature"
 ]
 
 ERA5_MODEL_LEVELS = "110/to/137"

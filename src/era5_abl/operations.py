@@ -1,6 +1,9 @@
 import xarray as xr
 import numpy as np
-
+from .config import (
+    REFERENCE_PRESSURE,
+    POISSON_EXPONENT
+)
 
 def compute_BLH_from_Ri_b(ds: xr.Dataset, Ri_c: float = 0.25, z_min: float = 20.0, 
                           z_max: float | None = 3000.0, persistence: int = 2
@@ -150,3 +153,40 @@ def compare_diagnosed_and_era5_blh(ds_ml: xr.Dataset, ds_srf: xr.Dataset) -> Non
             [0.05, 0.5, 0.95]
         ).values,
     )
+
+def compute_thetav(ds: xr.Dataset):
+    """
+    Computes virtual potential temperature (theta_v) from a model-level dataset 
+    containing pressure and humidity. Distinguishes between surface and model level datasets.
+    """
+
+    gamma = POISSON_EXPONENT
+    P0 = REFERENCE_PRESSURE
+
+    if "model_level" in ds.coords:
+        # Compute virtual temperature
+        t_v = ds["t"] * (1.0 + 0.608 * ds["q"])
+        # Computes virtual potential temperature
+        theta_v = t_v * (P0 / ds["pressure"]) ** gamma
+        # Assign to dataset
+        ds = ds.assign(theta_v=(("time", "model_level"), theta_v))
+    else:
+        # Compute vapor pressure from dew-point temperature (Magnus approx.)
+        T, Td, p = ds["t2m"], ds["d2m"], ds["sp"]
+        e = 611.2 * np.exp(17.67 * (Td - 273.15)/ (Td - 29.65))
+        # Compute sspecific humidity
+        eps = 0.622
+        q = eps * e / (p - (1.0 - eps) * e)
+        # Compute virtual temperature
+        Tv = T * (1.0 + 0.608 * q)
+        # Finally, the virtual potential temperature
+        theta_v = Tv * (
+            REFERENCE_PRESSURE / p
+        ) ** POISSON_EXPONENT
+        # Assign to dataset
+        ds = ds.assign(
+            q2m=q,
+            theta_v_2m=theta_v,
+        )
+
+    return ds
