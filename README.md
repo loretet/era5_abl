@@ -25,6 +25,10 @@ python -m pip install -e .
 
 NOTE: The preprocessing code also calls the external `cdo` executable. CDO must be installed separately and available on the system `PATH`.
 
+The dependencies needed for the package to work can be ofund under `scripts/setup.py`.
+The user can also run `setup.py`to install all the required packages.
+
+
 ## Configuration
 
 Stable site metadata and physical constants are stored in
