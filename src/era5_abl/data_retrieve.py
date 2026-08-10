@@ -124,23 +124,24 @@ def parallel_retrieval(
             )
 
         print(f"Finished retrieval for {name}")
-        
-    print("--- Retrieving ERA5 data in parallel ---")
-    print("WARNING: this might take a while.") 
-    print("Expect around 2h per year for surface data (nine variables over 0.25x0.25 deg area)")
-    print("and 24h per year for model level data (five variables over one 0.25x0.25 deg area).")
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [
-            executor.submit(
-                retrieve_site,
-                name,
-                site,
-                retrieve_srf_data,
-                retrieve_ml_data
-            )
-            for name, site in SITE_CONFIGS.items()
-        ]
+    if retrieve_srf_data or retrieve_ml_data:
+        print("--- Retrieving ERA5 data in parallel ---")
+        print("WARNING: this might take a while.") 
+        print("Expect around 2h per year for surface data (nine variables over 0.25x0.25 deg area)")
+        print("and 24h per year for model level data (five variables over one 0.25x0.25 deg area).")
 
-        for future in futures:
-            future.result()
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [
+                executor.submit(
+                    retrieve_site,
+                    name,
+                    site,
+                    retrieve_srf_data,
+                    retrieve_ml_data
+                )
+                for name, site in SITE_CONFIGS.items()
+            ]
+
+            for future in futures:
+                future.result()
