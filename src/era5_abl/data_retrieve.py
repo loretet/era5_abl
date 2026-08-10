@@ -77,11 +77,13 @@ def parallel_retrieval(
     output_dir: str | Path,
     max_workers: int = 4,
     surface_variables: list[str] = ERA5_SURFACE_VARIABLES,
-    params: str = ERA5_MODEL_LEVEL_PARAMS,
+    ml_params: str = ERA5_MODEL_LEVEL_PARAMS,
     dt: str = ERA5_DELTA_TIME,
     mls: str = ERA5_MODEL_LEVELS,
     res: str = ERA5_GRID,
     format: str = ERA5_FORMAT,
+    retrieve_srf_data: bool = True,
+    retrieve_ml_data: bool = True
 ) -> None:
     """
     Retrieves ERA5 data in parallel for each distinct site. However, within each site,
@@ -112,7 +114,7 @@ def parallel_retrieval(
             area=site.area,
             dates=dates,
             output_path=str(model_level_path),
-            params=params,
+            params=ml_params,
             dt=dt,
             mls=mls,
             res=res,
