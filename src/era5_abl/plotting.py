@@ -1,10 +1,11 @@
 import xarray as xr
 import numpy as np
-import matplotlib.pylplot as plt
+import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
-from .operations import compute_difference_surface_top_ABL, interpolate_to_height
+from .operations import interpolate_to_height
+from .stability import compute_difference_surface_top_ABL
 
 
 DATASET_STYLES = [
@@ -31,14 +32,14 @@ def plot_in_time(
     fig = plt.figure(figsize=(6, 8))
     for i, t in enumerate(times):
         ds_time = ds.sel({time_dim: t})
-        style = style[i % len(style)]
+        ds_style = style[i % len(style)]
         lbl = str(t)[:16] if (i == 0 or i == N - 1) else None
         plt.plot(
             ds_time[var_name],
             ds_time["z"],
-            color=style["color"],
-            linestyle=style["linestyle"],
-            marker=style["marker"],
+            color=ds_style["color"],
+            linestyle=ds_style["linestyle"],
+            marker=ds_style["marker"],
             label=lbl,
         )
 
@@ -65,7 +66,7 @@ def plot_abl_top_vs_surface_scatter_contour(
     fig, ax = plt.subplots(figsize=(9, 7))
 
     for idx, (name, ds) in enumerate(ds_dict.items()):
-        style = style[idx % len(style)]
+        ds_style = style[idx % len(style)]
         ds_srf = ds_srf_dict[name]
 
         # 1. Compute Temperature Difference (ABL Top - Surface)
@@ -92,7 +93,7 @@ def plot_abl_top_vs_surface_scatter_contour(
         ax.scatter(
             x_val,
             y_val,
-            color=style["color"],
+            color=ds_style["color"],
             alpha=0.25,
             s=20,
             edgecolors="none",
@@ -103,10 +104,10 @@ def plot_abl_top_vs_surface_scatter_contour(
             x=x_val,
             y=y_val,
             ax=ax,
-            color=style["color"],
+            color=ds_style["color"],
             levels=4,
             linewidths=1.5,
-            linestyles=style["linestyle"],
+            linestyles=ds_style["linestyle"],
             label=f"{name}",
         )
 
@@ -140,7 +141,7 @@ def plot_multi_dataset_pdf(
     fig, ax = plt.subplots(figsize=(8, 6))
 
     for idx, (name, ds) in enumerate(ds_dict.items()):
-        style = style[idx % len(style)]
+        ds_style = style[idx % len(style)]
 
         if var_name not in ds:
             raise KeyError(f"Variable '{var_name}' not found in dataset '{name}'.")
@@ -176,8 +177,8 @@ def plot_multi_dataset_pdf(
         ax.plot(
             bin_centers,
             counts,
-            color=style["color"],
-            linestyle=style["linestyle"],
+            color=ds_style["color"],
+            linestyle=ds_style["linestyle"],
             linewidth=2,
             label=f"{name}",
         )
@@ -206,7 +207,7 @@ def plot_Ri_vs_stability_function(
     target_var = "fm" if func_type == "fm" else "fh"
 
     for idx, (name, ds) in enumerate(ds_dict.items()):
-        style = style[idx % len(style)]
+        ds_style = style[idx % len(style)]
 
         # Extract Ri at reference_height and stability function arrays
         ri_ref = interpolate_to_height(ds, "Ri_g", None, reference_height).values.flatten()
@@ -223,8 +224,8 @@ def plot_Ri_vs_stability_function(
         ax.plot(
             f_plot[sort_idx],
             ri_plot[sort_idx],
-            color=style["color"],
-            linestyle=style["linestyle"],
+            color=ds_style["color"],
+            linestyle=ds_style["linestyle"],
             linewidth=2,
             label=f"{name}",
         )
@@ -262,7 +263,7 @@ def plot_vertical_profile(
     fig, ax = plt.subplots(figsize=(7, 8))
 
     for idx, (name, ds) in enumerate(ds_dict.items()):
-        style = style[idx % len(style)]
+        ds_style = style[idx % len(style)]
 
         if var_name not in ds or "z" not in ds:
             raise KeyError(
@@ -284,8 +285,8 @@ def plot_vertical_profile(
             ax.plot(
                 var_vals[valid_mask][sort_idx],
                 z_vals[valid_mask][sort_idx],
-                color=style["color"],
-                linestyle=style["linestyle"],
+                color=ds_style["color"],
+                linestyle=ds_style["linestyle"],
                 linewidth=2,
                 label=f"{name}",
             )
@@ -328,7 +329,7 @@ def plot_vertical_profile(
                     var_vals[valid_mask][sort_idx],
                     z_vals[valid_mask][sort_idx],
                     color=colors[t_idx],
-                    linestyle=style["linestyle"],
+                    linestyle=ds_style["linestyle"],
                     linewidth=1.5,
                     alpha=0.7,
                     label=lbl,
@@ -345,8 +346,8 @@ def plot_vertical_profile(
             ax.plot(
                 var_mean[valid_mask][sort_idx],
                 z_mean[valid_mask][sort_idx],
-                color=style["color"],
-                linestyle=style["linestyle"],
+                color=ds_style["color"],
+                linestyle=ds_style["linestyle"],
                 linewidth=2,
                 label=f"{name} (Time Mean)",
             )

@@ -2,12 +2,15 @@
 # Performs analysis of ERA5 surface and model level datasets for four locations.
 
 #%% Imports
+%load_ext autoreload
+%autoreload 2
 from pathlib import Path
 import era5_abl as era
-from era5_abl.config import SITE_CONFIGS, get_site_config
-from era5_abl.data_retrieve import (
-    retrieve_surface_data,
-    retrieve_model_level_data,
+from era5_abl.config import SITE_CONFIGS
+from era5_abl.plotting import (plot_multi_dataset_pdf,
+    plot_abl_top_vs_surface_scatter_contour,
+    plot_Ri_vs_stability_function,
+    plot_vertical_profile
 )
 
 # %% User configuration
@@ -22,8 +25,8 @@ DATA_RETRIEVAL = False
 # Dates considered:
 DATES = "2020-01-01/2021-12-31"
 # Cloud filtering thresholds:
-LCC_THRESH = 0.1
-CLOUD_WINDOW_HOURS = 3
+LCC_THRESH = 0.15
+CLOUD_WINDOW_HOURS = 2
 # Critical Richardson:
 RI_C = 0.25
 # Stability filtering thresholds:
@@ -32,6 +35,7 @@ MIN_VALID_FRACTION = 0.8
 SMOOTH_WINDOW = 3
 # Reference height for some transfer functions/stability computations:
 REFERENCE_HEIGHT = 20.0
+
 
 #%% Retrieve ERA5 data
 if DATA_RETRIEVAL:
@@ -44,6 +48,7 @@ if DATA_RETRIEVAL:
 # If one only wants one site:
 # site_name = "Mace Head"
 # site = SITE_CONFIGS[site_name]
+
 
 #%% Main pipeline
 ds_ml_dict = {}
@@ -88,6 +93,7 @@ for loc, site in SITE_CONFIGS.items():
     # Filtering is finished
     ds_ml_filtered = ds_ml_f3
     ds_srf_filtered = ds_srf_f3
+    era.print_filter_output(ds_ml_f0, ds_ml_f3, "Total filtering results from the initial dataset")
 
     # Stability functions computation
     eps, eps_t = era.compute_epsilon(location=loc, reference_height=REFERENCE_HEIGHT)
@@ -115,22 +121,26 @@ for loc, site in SITE_CONFIGS.items():
     ds_ml_dict[loc] = ds_ml_filtered
     ds_srf_dict[loc] = ds_srf_filtered
 
+
 # %% Plotting & Analysis
 # Example 1 (time variable): PDF comparison of BLH across locations and ocmpare to diagnosed one
-era.plot_multi_dataset_pdf(ds_ml_dict, var_name="BLH_Ri", bins=40) 
-era.plot_multi_dataset_pdf(ds_srf_dict, var_name="blh", bins=40)    
+plot_multi_dataset_pdf(ds_ml_dict, var_name="BLH_Ri", bins=40) 
+plot_multi_dataset_pdf(ds_srf_dict, var_name="blh", bins=40)    
 
 # Example 2 (time-height variable): PDF comparison of Theta_v at 100m AGL
-era.plot_multi_dataset_pdf(ds_ml_dict, var_name="Ri_g", target_height=100.0, bins=50)
+plot_multi_dataset_pdf(ds_ml_dict, var_name="Ri_g", target_height=100.0, bins=50)
 
 # Example 3: Scatter/KDE of Delta T vs Wind speed at BLH
-era.plot_abl_top_vs_surface_scatter_contour(ds_ml_dict, ds_srf_dict, temp_var="t")
+plot_abl_top_vs_surface_scatter_contour(ds_ml_dict, ds_srf_dict, temp_var="t")
 
 # Example 4: Stability correction function curves
-era.plot_Ri_vs_stability_function(ds_ml_dict, func_type="fm", reference_height=REFERENCE_HEIGHT)
+plot_Ri_vs_stability_function(ds_ml_dict, func_type="fm", reference_height=REFERENCE_HEIGHT)
 
 # Example 5: Single timestamp vertical profile
-era.plot_vertical_profile(ds_ml_dict, "theta_v", time="2020-07-15T12:00:00")
+plot_vertical_profile(ds_ml_dict, "theta_v", time="2020-07-15T12:00:00")
 
 # Example 6: Time-Range variable profile sequence 
-era.plot_vertical_profile(ds_ml_dict, "Ri_g", time_range=("2020-07-15T06:00:00", "2020-07-25T12:00:00"))
+plot_vertical_profile(ds_ml_dict, "Ri_g", time_range=("2020-07-15T06:00:00", "2020-07-25T12:00:00"))
+
+
+#%%

@@ -43,8 +43,8 @@ def compute_BLH_from_Ri_b(ds: xr.Dataset, Ri_c: float = 0.25, z_min: float = 20.
             fail_count += 1
 
     if fail_count >= 1:
-        print(f"WARNING - compute_BLH_from_Ri_b: Threshold Ri_b was not crossed more than \
-            persistence={persistence} times in a row\nfor {fail_count} timesteps. For these, BLH is NaN")
+        print(f"WARNING - compute_BLH_from_Ri_b: Threshold Ri_b was not crossed more than")
+        print(f"persistence={persistence} times in a row for {fail_count} timesteps. For these, BLH is NaN")
 
     # Assign to BLH variable in the dataset
     ds = ds.assign(BLH_Ri=("time", BLH))
