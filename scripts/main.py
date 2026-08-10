@@ -1,77 +1,128 @@
 # 2026, L. Donati
-# Performs analysis of ERA5 datasets for four locations.
-# Work done for the paper X
+# Performs analysis of ERA5 surface and model level datasets for four locations.
 
 #%% Imports
-import os
+from pathlib import Path
 import era5_abl as era
+from era5_abl.config import SITE_CONFIGS, get_site_config
+from era5_abl.data_retrieve import (
+    retrieve_surface_data,
+    retrieve_model_level_data,
+)
 
-#%% Configuration
-data_dir = "/Users/lodo0477/Documents/PhD/Research/Entrainment_with_Palli/ERA5_data"
+# %% User configuration
 
-# Define location metadata maps
-site_configs = {
-    "Mace Head": {
-        "ml_grib": os.path.join(data_dir, "MaceHead_lvls.grib"),
-        "srf_grib": os.path.join(data_dir, "MaceHead_surface.grib"),
-        "wind_sector": (180.0, 360.0),  # Marine sector 
-    },
-    "Cabauw": {
-        "ml_grib": os.path.join(data_dir, "Cabauw_lvls.grib"),
-        "srf_grib": os.path.join(data_dir, "Cabauw_surface.grib"),
-        "wind_sector": (0.0, 360.0)
-    },
-    "Summit Station": {
-        "ml_grib": os.path.join(data_dir, "SummitStation_lvls.grib"),
-        "srf_grib": os.path.join(data_dir, "SummitStation_surface.grib"),
-        "wind_sector": (0.0, 360.0)
-    },
-    "Southern Great Plains": {
-        "ml_grib": os.path.join(data_dir, "ARMGreatPlains_lvls.grib"),
-        "srf_grib": os.path.join(data_dir, "ARMGreatPlains_surface.grib"),
-        "wind_sector": (0.0, 360.0)
-    },
-}
+# Directory with data:
+DATA_DIR = Path(
+    "/Users/lodo0477/Documents/PhD/Research/"
+    "Entrainment_with_Palli/ERA5_data"
+)
+# Whether to retrieve data with CDS API or not:
+DATA_RETRIEVAL = False
+# Dates considered:
+DATES = "2020-01-01/2021-12-31"
+# Cloud filtering thresholds:
+LCC_THRESH = 0.1
+CLOUD_WINDOW_HOURS = 3
+# Critical Richardson:
+RI_C = 0.25
+# Stability filtering thresholds:
+GRAD_TOL = -2e-4
+MIN_VALID_FRACTION = 0.8
+SMOOTH_WINDOW = 3
+# Reference height for some transfer functions/stability computations:
+REFERENCE_HEIGHT = 20.0
 
+#%% Retrieve ERA5 data
+if DATA_RETRIEVAL:
+    for site_name, site in SITE_CONFIGS.items():
+
+        site = get_site_config(site_name)
+
+        retrieve_surface_data(
+            area=site.area,
+            dates=DATES,
+            output_path=str(
+                DATA_DIR / site.surface_filename
+            ),
+        )
+
+        retrieve_model_level_data(
+            area=site.area,
+            dates=DATES,
+            output_path=str(
+                DATA_DIR / site.model_level_filename
+            ),
+        )
+
+# If one only wants one site:
+# site_name = "Mace Head"
+# site = SITE_CONFIGS[site_name]
+
+#%% Main pipeline
 ds_ml_dict = {}
 ds_srf_dict = {}
 
-#%% Main pipeline
-for loc, cfg in site_configs.items():
+# Process each dataset
+for loc, site in SITE_CONFIGS.items():
     print(f"\n--- Processing Location: {loc} ---")
+    ml_path = DATA_DIR / site.model_level_filename
+    srf_path = DATA_DIR / site.surface_filename
 
     # File prep and spatial averaging
-    ds_ml, ds_srf = era.prepare_dataset(cfg["ml_grib"], cfg["srf_grib"], location=loc)
+    ds_ml, ds_srf = era.prepare_dataset(str(ml_path), str(srf_path), location=loc)
 
     # Cloud filtering
     ds_ml_f0, ds_srf_f0 = ds_ml.copy(), ds_srf.copy()
-    ds_ml_f1, ds_srf_f1 = era.filter_clouds(ds_ml_f0, ds_srf_f0, lcc_thresh=0.1, window_hours=3)
-    _ = era.print_filter_output(ds_ml_f0, ds_ml_f1, "Low cloud cover filtering")
+    ds_ml_f1, ds_srf_f1 = era.filter_clouds(
+        ds_ml_f0, ds_srf_f0, 
+        lcc_thresh=LCC_THRESH, window_hours=CLOUD_WINDOW_HOURS
+    )
+    era.print_filter_output(ds_ml_f0, ds_ml_f1, "Low cloud cover filtering")
 
     # Stability filtering
-    ds_ml_f1 = era.compute_grad_Ri_z(ds_ml_f1)
-    ds_ml_f1 = era.compute_BLH_from_Ri_b(ds_ml_f1, Ri_c=0.25)
-    ds_ml_f2, ds_srf_f2 = era.filter_stability(ds_ml_f1, ds_srf_f1, tol=1e-5)
-    _ = era.print_filter_output(ds_ml_f1, ds_ml_f2, "Stability filtering")
+    ds_ml_f1 = era.compute_grad_Ri(ds_ml_f1)
+    ds_ml_f1 = era.compute_bulk_Ri(ds_ml_f1)
+    ds_ml_f1 = era.compute_BLH_from_Ri_b(ds_ml_f1, Ri_c=RI_C)
+    ds_ml_f2, ds_srf_f2 = era.filter_stability(ds_ml_f1, ds_srf_f1,
+        ri_surface_min=0.0, grad_tol=GRAD_TOL,
+        min_valid_fraction=MIN_VALID_FRACTION, smooth_window=SMOOTH_WINDOW,
+    )
+    era.print_filter_output(ds_ml_f1, ds_ml_f2, "Stability filtering")
 
     # Wind direction filtering
     ds_ml_f2 = era.compute_wind_dir(ds_ml_f2)
-    if "wind_sector" in cfg:
-        dir_min, dir_max = cfg["wind_sector"]
-        ds_ml_f3, ds_srf_f3 = era.filter_wind_dir(ds_ml_f2, dir_min, dir_max)
-        _ = era.print_filter_output(ds_ml_f2, ds_ml_f3, "Wind direction sector filtering")
-        ds_ml_filtered, ds_srf_filtered = ds_ml_f3, ds_srf_f3
-    else:
-        ds_ml_filtered, ds_srf_filtered = ds_ml_f2, ds_srf_f2
-    _ = era.print_filter_output(ds_ml_f0, ds_ml_filtered, "Total filtering")
+    dir_min, dir_max = site.wind_sector
+    ds_ml_f3, ds_srf_f3 = era.filter_wind_dir(
+        ds_ml_f2, ds_srf_f2,
+        dir_min, dir_max,
+    )
+    era.print_filter_output(ds_ml_f2, ds_ml_f3, "Wind direction filtering")
 
+    # Filtering is finished
+    ds_ml_filtered = ds_ml_f3
+    ds_srf_filtered = ds_srf_f3
 
     # Stability functions computation
-    eps, eps_t = era.compute_epsilon(ds_ml_filtered, location=loc)
-    ds_ml_filtered = era.compute_zeta_GL18(ds_ml_filtered, epsilon=eps, epsilon_t=eps_t)
-    fm_20 = era.compute_fm(ds_ml_filtered, epsilon=eps)
-    fh_20 = era.compute_fh(fm_20, ds_ml_filtered, epsilon_t=eps_t)
-    ds_ml_filtered = ds_ml_filtered.assign(fm_20=fm_20, fh_20=fh_20)
+    eps, eps_t = era.compute_epsilon(location=loc, reference_height=REFERENCE_HEIGHT)
+    ds_ml_filtered = era.compute_zeta_GL18(
+        ds_ml_filtered,
+        epsilon=eps,
+        epsilon_t=eps_t,
+    )
+    fm_20 = era.compute_fm(
+        ds_ml_filtered,
+        epsilon=eps,
+    )
+    fh_20 = era.compute_fh(
+        fm_20,
+        ds_ml_filtered,
+        epsilon_t=eps_t,
+    )
+    ds_ml_filtered = ds_ml_filtered.assign(
+        fm_20=fm_20,
+        fh_20=fh_20,
+    )
 
     # Store for multi-site comparisons
     ds_ml_dict[loc] = ds_ml_filtered
@@ -79,7 +130,7 @@ for loc, cfg in site_configs.items():
 
 # %% Plotting & Analysis
 # Example 1 (time variable): PDF comparison of BLH across locations and ocmpare to diagnosed one
-era.plot_multi_dataset_pdf(ds_ml_dict, var_name="BLH", bins=40) 
+era.plot_multi_dataset_pdf(ds_ml_dict, var_name="BLH_Ri", bins=40) 
 era.plot_multi_dataset_pdf(ds_srf_dict, var_name="blh", bins=40)    
 
 # Example 2 (time-height variable): PDF comparison of Theta_v at 100m AGL
