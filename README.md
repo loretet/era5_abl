@@ -59,16 +59,6 @@ from era5_abl.filters import filter_stability
 - `filters.py`: cloud, stability, and wind-direction filters.
 - `plotting.py`: plotting only.
 
-## Tests
-
-Run:
-
-```bash
-pytest
-```
-
-Start with small synthetic profiles rather than full ERA5 files.
-
 ## Status
 
 This package is under active development. 
