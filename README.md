@@ -25,6 +25,21 @@ python -m pip install -e .
 
 NOTE: The preprocessing code also calls the external `cdo` executable. CDO must be installed separately and available on the system `PATH`.
 
+## Configuration
+
+Stable site metadata and physical constants are stored in
+`era5_abl.config` (modifiable in the `era5_abl/config.py` file).
+
+For example:
+
+```python
+from era5_abl.config import SITE_CONFIGS
+
+site = SITE_CONFIGS["Mace Head"]
+
+print(site.area)
+print(site.wind_sector)
+
 ## Basic usage
 
 ```python

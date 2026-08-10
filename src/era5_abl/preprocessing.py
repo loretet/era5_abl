@@ -1,6 +1,12 @@
 import xarray as xr
 import numpy as np
 import os, subprocess
+from .config import (
+    GRAVITY,
+    DRY_AIR_GAS_CONSTANT,
+    REFERENCE_PRESSURE,
+    POISSON_EXPONENT
+)
 
 
 def compute_ecmwf_pressure_and_height(ds_ml: xr.Dataset, ds_srf: xr.Dataset) -> tuple[xr.DataArray, xr.DataArray]:
@@ -9,8 +15,8 @@ def compute_ecmwf_pressure_and_height(ds_ml: xr.Dataset, ds_srf: xr.Dataset) -> 
     using A_k and B_k coefficients embedded in the NetCDF dataset (from GRIB VCT).
     Built with help of AI. NOTE: this reconstruction is APPROXIMATE.
     """
-    g = 9.80665
-    R_d = 287.058
+    g = GRAVITY
+    R_d = DRY_AIR_GAS_CONSTANT
 
     # Extract surface pressure [Pa]
     if "lnsp" in ds_ml:
@@ -134,8 +140,7 @@ def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None)
     3D pressure p(t, k) and hydrostatic height z_agl(t, k) from hybrid coefficients,
     derives theta_v, and reverses the vertical axis so k=0 is the surface.
     """
-    g = 9.80665
-    P0 = 100000.0
+    P0 = REFERENCE_PRESSURE
 
     # Output paths
     ml_nc_path = grib_ml_path.replace(".grib", "_CDO_processed.nc")
@@ -184,7 +189,7 @@ def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None)
 
     # Compute Virtual Potential Temperature 
     t_v = ds_ml["t"] * (1.0 + 0.608 * ds_ml["q"])
-    ds_ml["theta_v"] = t_v * (P0 / ds_ml["pressure"]) ** 0.2854
+    ds_ml["theta_v"] = t_v * (P0 / ds_ml["pressure"]) ** POISSON_EXPONENT
 
     # Compute wind speed 
     ds_ml["wind_speed"] = np.sqrt(ds_ml["u"]**2 + ds_ml["v"]**2)

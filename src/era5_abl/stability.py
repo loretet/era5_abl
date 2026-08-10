@@ -1,15 +1,17 @@
 import numpy as np
 import xarray as xr
 from .operations import interpolate_to_height
+from .config import (
+    GRAVITY
+)
 
-
-def compute_grad_Ri_z(ds: xr.Dataset) -> xr.Dataset:
+def compute_grad_Ri(ds: xr.Dataset) -> xr.Dataset:
     """
     Computes Gradient Richardson Number profiles over non-uniform physical height
     z(t, k) using central differences.
     """
 
-    g = 9.80665
+    g = GRAVITY
 
     z = ds["z"].values  # (time, level)
     theta_v = ds["theta_v"].values  # (time, level)
@@ -81,7 +83,7 @@ def compute_bulk_Ri(ds: xr.Dataset, reference_height: float = 20.0, velocity_off
     reference height.
     """
 
-    g = 9.80665
+    g = GRAVITY
 
     # Get reference va,lues
     theta_ref = interpolate_to_height(ds, "theta_v", None, reference_height)

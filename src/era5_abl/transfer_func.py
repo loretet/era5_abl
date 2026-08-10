@@ -1,32 +1,19 @@
 import numpy as np
 import xarray as xr
+from .config import get_site_config
 from .operations import interpolate_to_height
 
-def compute_epsilon(ds: xr.Dataset, location: str) ->  tuple[float, float]:
+def compute_epsilon(location: str, reference_height: float = 20.0,) -> tuple[float, float]:
     """ 
     Computes ration between z (20 m) and z0 or zt from surface data.
     """
-    # One can either select time-varying values (based on seasonality and land cover) from ERA5 or assume constant
-    # values depending on the location. Here, I choose to keep them constant (seemed suitable to the scope of this work).
-    # Bear in mind that epsilon only appears in logarithms in GL18 functions, meaning that the roughenss lengths variations 
-    # are compressed (e.g. 100% variation in z0 leads to 13% variation in log(z/z0) with z=20m)
-    if ds.attrs['Location'] == "Mace Head": # Roughly based on He et al. (2021). Reduced Sea-Surface Roughness Length at a Coastal Site. Atmosphere, 12(8):991. 
-        z0 = 0.005  # marine sector 
-        zt = 0.0005 # depends on wind direction. Might need additional filtering
-    elif ds.attrs['Location'] == "Cabauw": # Beljaars & Bosveld (1997). Cabauw data for the verification of land surface schemes. Journal of Climate, 10(6), 1194–1207.
-        z0 = 0.15
-        zt = z0*0.1
-    elif ds.attrs['Location'] == "Southern Great Plains": # Jacobs & Brutsaert. (1998). Momentum roughness and view-angle dependent heat roughness at a Southern Great Plains test-site. Journal of Hydrology, 211(1), 62-68.
-        z0 = 0.15  # quite variable during the year (crops)
-        zt = 0.003
-    elif ds.attrs['Location'] == "Summit Station": # Miller et al. (2017). Surface energy budget responses to radiative forcing at Summit, Greenland. The Cryosphere. 11(1), 497-516.
-        z0 = 0.0004
-        zt = 0.0001
-    else:
-        print("No location specified: assigning default roughness lengths values")
-        z0 = 0.1
-        zt = z0*0.2
-    return 20/z0, 20/zt
+
+    site = get_site_config(location)
+
+    epsilon = reference_height / site.roughness_length_momentum
+    epsilon_t = reference_height / site.roughness_length_heat
+
+    return epsilon, epsilon_t
 
 def compute_zeta_GL18(ds: xr.Dataset, epsilon: float, epsilon_t: float) -> xr.Dataset:
     """

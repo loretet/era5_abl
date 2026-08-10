@@ -229,7 +229,7 @@ def plot_Ri_vs_stability_function(
 
     x_label_str = "$f_m(z/L)$" if func_type == "fm" else "$f_h(z/L)$"
     ax.set_xlabel(f"Stability Correction Factor {x_label_str}", fontsize=11)
-    ax.set_ylabel("Gradient Richardson Number $Ri_{20m}$", fontsize=11)
+    ax.set_ylabel(r"Gradient Richardson Number $Ri_{20m}$", fontsize=11)
     ax.set_title(
         f"Surface Layer Stability Function ({x_label_str}) vs. $Ri_{{20m}}$",
         fontsize=12,

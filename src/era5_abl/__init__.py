@@ -15,7 +15,7 @@ from .operations import (
 )
 
 from .stability import(
-    compute_grad_Ri_z,
+    compute_grad_Ri,
     compute_bulk_Ri,
     compute_difference_surface_top_ABL,
 )
@@ -26,9 +26,16 @@ from .filters import (
     filter_wind_dir,
 )
 
+from .transfer_func import (
+    compute_epsilon,
+    compute_zeta_GL18,
+    compute_fm,
+    compute_fh,
+)
+
 __all__ = [
     "prepare_dataset",
-    "compute_grad_Ri_z",
+    "compute_grad_Ri",
     "compute_bulk_Ri",
     "compute_BLH_from_Ri_b",
     "compare_diagnosed_and_era5_blh",
@@ -39,6 +46,10 @@ __all__ = [
     "interpolate_to_height",
     "compute_PDF",
     "compute_difference_surface_top_ABL",
+    "compute_epsilon",
+    "compute_zeta_GL18",
+    "compute_fm",
+    "compute_fh",
 ]
 
 __version__ = "0.1.0"
