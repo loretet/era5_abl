@@ -5,7 +5,7 @@ from .operations import interpolate_to_height
 
 def compute_epsilon(location: str, reference_height: float = 20.0,) -> tuple[float, float]:
     """ 
-    Computes ration between z (20 m) and z0 or zt from surface data.
+    Computes ration between z (at ref. height) and z0 or zt from surface data.
     """
 
     site = get_site_config(location)
@@ -15,10 +15,10 @@ def compute_epsilon(location: str, reference_height: float = 20.0,) -> tuple[flo
 
     return epsilon, epsilon_t
 
-def compute_zeta_GL18(ds: xr.Dataset, epsilon: float, epsilon_t: float) -> xr.Dataset:
+def compute_zeta_GL18(ds: xr.Dataset, epsilon: float, epsilon_t: float, reference_height: float) -> xr.Dataset:
     """
     Computes the atmospheric stability parameter zeta (z/L) from Eq. 21 of Gryanik & Lüpkes 2018 (GL18).
-    Considers z = 20 m. NB: ONLY valid for Ri >= 0! NB2: They used 10 m as reference height
+    Considers z at reference_height. NB: ONLY valid for Ri >= 0! NB2: They used 10 m as reference height
     """
     ln_eps = np.log(epsilon)
     ln_epst = np.log(epsilon_t)
@@ -31,25 +31,25 @@ def compute_zeta_GL18(ds: xr.Dataset, epsilon: float, epsilon_t: float) -> xr.Da
     coeff_nonlinear = (B**3.82) / (11.5 * (C**1.91))
     bracket = (B**2) / C - A
 
-    # Extract (interpolate) Ri at z = 20 m AGL per timestep
-    Ri_20 = interpolate_to_height(ds, "Ri_g", None, 20.0)
+    # Extract (interpolate) Ri at z = reference_height AGL per timestep
+    Ri_ref = interpolate_to_height(ds, "Ri_g", None, reference_height)
 
-    Ri_20_pos = np.maximum(Ri_20, 0.0)  # Restrict to positive Ri (enutral/stable)
-    zeta = (coeff_linear * Ri_20_pos) + (
-        coeff_nonlinear * bracket * (Ri_20_pos**2.91)
+    Ri_ref_pos = np.maximum(Ri_ref, 0.0)  # Restrict to positive Ri (enutral/stable)
+    zeta = (coeff_linear * Ri_ref_pos) + (
+        coeff_nonlinear * bracket * (Ri_ref_pos**2.91)
     )
     # Assign to the starting dataset
-    ds = ds.assign(zeta_20=zeta)
+    ds = ds.assign(zeta_ref=zeta)
 
     return ds
 
-def compute_fm(ds: xr.Dataset, epsilon: float ) -> xr.DataArray:
+def compute_fm(ds: xr.Dataset, epsilon: float) -> xr.DataArray:
     """
     Computes the momentum stability correction function f_m (Eq. 22 of Gryanik and Lüpkes)
-    Considers z = 20 m. NB: ONLY valid for Ri >= 0! NB2: They used 10 m as reference height
+    Considers z = reference_height. NB: ONLY valid for Ri >= 0! NB2: They used 10 m as reference height
     """
-    zeta_20_pos = np.maximum(ds.zeta_20, 0.0) # Restrict to positive Richardson (neutral/stable)
-    x = np.cbrt(1.0 + zeta_20_pos)
+    zeta_ref_pos = np.maximum(ds.zeta_ref, 0.0) # Restrict to positive Richardson (neutral/stable)
+    x = np.cbrt(1.0 + zeta_ref_pos)
     ln_eps = np.log(epsilon)
 
     num_log = (x + 0.67) ** 2
@@ -67,14 +67,14 @@ def compute_fm(ds: xr.Dataset, epsilon: float ) -> xr.DataArray:
 def compute_fh(fm: xr.DataArray, ds: xr.Dataset, epsilon_t: float) -> xr.DataArray:
     """
     Computes the momentum stability correction function f_m (Eq. 22 of Gryanik and Lüpkes)
-    Considers z = 10 m. NB: ONLY valid for Ri >= 0!
+    Considers z = reference_height. NB: ONLY valid for Ri >= 0!
     """
     ln_epst = np.log(epsilon_t)
 
-    zeta_20_pos = np.maximum(ds.zeta_20, 0.0) # Restrict to positive values (neutral/stable)
+    zeta_ref_pos = np.maximum(ds.zeta_ref, 0.0) # Restrict to positive values (neutral/stable)
     term1 = 2.16
-    term2 = 2.5 * np.log(1.0 + (3.0 * zeta_20_pos) + (zeta_20_pos**2))
-    term3 = 1.12 * np.log((zeta_20_pos + 0.38) / (zeta_20_pos + 2.62))
+    term2 = 2.5 * np.log(1.0 + (3.0 * zeta_ref_pos) + (zeta_ref_pos**2))
+    term3 = 1.12 * np.log((zeta_ref_pos + 0.38) / (zeta_ref_pos + 2.62))
 
     bracket = (term1 - term2 + term3) / ln_epst
     fh = np.sqrt(fm) * ((1.0 - bracket) ** (-1.0))

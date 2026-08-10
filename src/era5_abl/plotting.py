@@ -192,27 +192,27 @@ def plot_multi_dataset_pdf(
 
 def plot_Ri_vs_stability_function(
     ds_dict: dict[str, xr.Dataset], func_type: str = "fm",
-    style: list[dict[str,str]] = DATASET_STYLES
+    reference_height: float = 20.0, style: list[dict[str,str]] = DATASET_STYLES
 ):
     """
-    Plots Gradient Richardson Number (Ri_20) on the y-axis against the GL18 stability
+    Plots Gradient Richardson Number on the y-axis against the GL18 stability
 
     functions f_m or f_h on the x-axis for all four datasets.
     """
     fig, ax = plt.subplots(figsize=(8, 6))
 
-    target_var = "fm_20" if func_type == "fm" else "fh_20"
+    target_var = "fm" if func_type == "fm" else "fh"
 
     for idx, (name, ds) in enumerate(ds_dict.items()):
         style = style[idx % len(style)]
 
-        # Extract Ri_20 and stability function arrays
-        ri_20 = interpolate_to_height(ds, "Ri_g", None, 20.0).values.flatten()
+        # Extract Ri at reference_height and stability function arrays
+        ri_ref = interpolate_to_height(ds, "Ri_g", None, reference_height).values.flatten()
         f_val = ds[target_var].values.flatten()
 
         # Filter to valid stable regime (Ri >= 0)
-        valid_mask = np.isfinite(ri_20) & np.isfinite(f_val) & (ri_20 >= 0)
-        ri_plot = ri_20[valid_mask]
+        valid_mask = np.isfinite(ri_ref) & np.isfinite(f_val) & (ri_ref >= 0)
+        ri_plot = ri_ref[valid_mask]
         f_plot = f_val[valid_mask]
 
         # Sort along Ri axis to guarantee clean line rendering
@@ -229,9 +229,9 @@ def plot_Ri_vs_stability_function(
 
     x_label_str = "$f_m(z/L)$" if func_type == "fm" else "$f_h(z/L)$"
     ax.set_xlabel(f"Stability Correction Factor {x_label_str}", fontsize=11)
-    ax.set_ylabel(r"Gradient Richardson Number $Ri_{20m}$", fontsize=11)
+    ax.set_ylabel(fr"Gradient Richardson Number $Ri_{int(reference_height)}$", fontsize=11)
     ax.set_title(
-        f"Surface Layer Stability Function ({x_label_str}) vs. $Ri_{{20m}}$",
+        f"Surface Layer Stability Function ({x_label_str}) vs. $Ri_{int(reference_height)}$",
         fontsize=12,
     )
     ax.grid(True, linestyle="--", alpha=0.5)

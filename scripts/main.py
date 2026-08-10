@@ -109,6 +109,7 @@ for loc, site in SITE_CONFIGS.items():
         ds_ml_filtered,
         epsilon=eps,
         epsilon_t=eps_t,
+        reference_height=REFERENCE_HEIGHT
     )
     fm_20 = era.compute_fm(
         ds_ml_filtered,
@@ -140,7 +141,7 @@ era.plot_multi_dataset_pdf(ds_ml_dict, var_name="Ri_g", target_height=100.0, bin
 era.plot_abl_top_vs_surface_scatter_contour(ds_ml_dict, ds_srf_dict, temp_var="t")
 
 # Example 4: Stability correction function curves
-era.plot_Ri_vs_stability_function(ds_ml_dict, func_type="fm")
+era.plot_Ri_vs_stability_function(ds_ml_dict, func_type="fm", reference_height=REFERENCE_HEIGHT)
 
 # Example 5: Single timestamp vertical profile
 era.plot_vertical_profile(ds_ml_dict, "theta_v", time="2020-07-15T12:00:00")
