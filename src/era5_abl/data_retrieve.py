@@ -94,32 +94,34 @@ def parallel_retrieval(
 
     output_dir = Path(output_dir)
 
-    def retrieve_site(name, site):
+    def retrieve_site(name, site, retrieve_srf_data, retrieve_ml_data):
 
         surface_path = output_dir / site.surface_filename
         model_level_path = output_dir / site.model_level_filename
 
-        print(f"Starting retrieval for {name}")
 
-        retrieve_surface_data(
-            area=site.area,
-            dates=dates,
-            output_path=str(surface_path),
-            variables=surface_variables,
-            dt=dt,
-            format=format,
-        )
-
-        retrieve_model_level_data(
-            area=site.area,
-            dates=dates,
-            output_path=str(model_level_path),
-            params=ml_params,
-            dt=dt,
-            mls=mls,
-            res=res,
-            format=format,
-        )
+        if retrieve_srf_data:
+            print(f"Starting surface data retrieval for {name}")
+            retrieve_surface_data(
+                area=site.area,
+                dates=dates,
+                output_path=str(surface_path),
+                variables=surface_variables,
+                dt=dt,
+                format=format,
+            )
+        if retrieve_ml_data:
+            print(f"Starting model level data retrieval for {name}")
+            retrieve_model_level_data(
+                area=site.area,
+                dates=dates,
+                output_path=str(model_level_path),
+                params=ml_params,
+                dt=dt,
+                mls=mls,
+                res=res,
+                format=format,
+            )
 
         print(f"Finished retrieval for {name}")
         
@@ -134,6 +136,8 @@ def parallel_retrieval(
                 retrieve_site,
                 name,
                 site,
+                retrieve_srf_data,
+                retrieve_ml_data
             )
             for name, site in SITE_CONFIGS.items()
         ]

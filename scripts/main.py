@@ -39,15 +39,14 @@ REFERENCE_HEIGHT = 20.0
 
 
 #%% Retrieve ERA5 data
-if DATA_RETRIEVAL:
-    era.parallel_retrieval(
-        dates=DATES,
-        output_dir=DATA_DIR,
-        max_workers=4,
-        surface_variables="2m_dewpoint_temperature"
-        retrieve_srf_data=SRF_DATA_RETRIEVAL,
-        retrieve_srf_data=ML_DATA_RETRIEVAL,
-    )
+era.parallel_retrieval(
+    dates=DATES,
+    output_dir=DATA_DIR,
+    max_workers=4,
+    surface_variables="2m_dewpoint_temperature",
+    retrieve_srf_data=SRF_DATA_RETRIEVAL,
+    retrieve_ml_data=ML_DATA_RETRIEVAL,
+)
 
 # If one only wants one site:
 # site_name = "Mace Head"
