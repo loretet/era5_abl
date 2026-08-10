@@ -1,2 +1,4 @@
 *.nc
+*.txt
+PKG-INFO
 *.grib
