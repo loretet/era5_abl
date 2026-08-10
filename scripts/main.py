@@ -21,7 +21,8 @@ DATA_DIR = Path(
     "Entrainment_with_Palli/ERA5_data"
 )
 # Whether to retrieve data with CDS API or not:
-DATA_RETRIEVAL = False
+SRF_DATA_RETRIEVAL = True
+ML_DATA_RETRIEVAL = False
 # Dates considered:
 DATES = "2020-01-01/2021-12-31"
 # Cloud filtering thresholds:
@@ -43,6 +44,9 @@ if DATA_RETRIEVAL:
         dates=DATES,
         output_dir=DATA_DIR,
         max_workers=4,
+        surface_variables="2m_dewpoint_temperature"
+        retrieve_srf_data=SRF_DATA_RETRIEVAL,
+        retrieve_srf_data=ML_DATA_RETRIEVAL,
     )
 
 # If one only wants one site:
