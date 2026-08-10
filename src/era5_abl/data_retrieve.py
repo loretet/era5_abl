@@ -5,9 +5,7 @@ from .config import (
     ERA5_MODEL_LEVEL_PARAMS,
     ERA5_MODEL_LEVELS,
     ERA5_SURFACE_VARIABLES,
-    ERA5_TIME,
-    ERA5_OUTPUT_DIR,
-    SITE_CONFIGS
+    ERA5_DELTA_TIME
 )
 
 # CDS API documentation: https://cds.climate.copernicus.eu/how-to-api
@@ -18,7 +16,7 @@ def retrieve_surface_data(
     dates: str,
     output_path: str,
     variables: list[str] = ERA5_SURFACE_VARIABLES,
-    dt: str = ERA5_TIME,
+    dt: str = ERA5_DELTA_TIME,
     format: str = ERA5_FORMAT,
 ) -> None:
     """Retrieve ERA5 single-level reanalysis data through the CDS API."""
@@ -43,7 +41,7 @@ def retrieve_model_level_data(
     dates: str,
     output_path: str,
     params: str = ERA5_MODEL_LEVEL_PARAMS,
-    dt: str = ERA5_TIME,
+    dt: str = ERA5_DELTA_TIME,
     mls: str = ERA5_MODEL_LEVELS,
     res: str = ERA5_GRID,
     format: str = ERA5_FORMAT,
