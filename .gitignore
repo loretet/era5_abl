@@ -2,3 +2,4 @@
 *.txt
 PKG-INFO
 *.grib
+*.cpython*
