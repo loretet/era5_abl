@@ -6,7 +6,6 @@
 import os
 import era5_abl as era
 
-
 #%% Configuration
 data_dir = "/Users/lodo0477/Documents/PhD/Research/Entrainment_with_Palli/ERA5_data"
 

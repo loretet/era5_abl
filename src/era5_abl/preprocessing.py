@@ -7,7 +7,7 @@ def compute_ecmwf_pressure_and_height(ds_ml: xr.Dataset, ds_srf: xr.Dataset) -> 
     """
     Computes 3D/2D pressure [Pa] and height AGL [m] on ECMWF hybrid model levels
     using A_k and B_k coefficients embedded in the NetCDF dataset (from GRIB VCT).
-    Built with help of AI.
+    Built with help of AI. NOTE: this reconstruction is APPROXIMATE.
     """
     g = 9.80665
     R_d = 287.058
