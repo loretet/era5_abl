@@ -7,6 +7,7 @@ import matplotlib.colors as mcolors
 from matplotlib.lines import Line2D    
 from .operations import interpolate_to_height
 from .stability import compute_difference_surface_top_ABL
+from .config import SITE_CONFIGS
 
 
 DATASET_STYLES = [
@@ -15,6 +16,16 @@ DATASET_STYLES = [
     {"color": "#2ca02c", "linestyle": "-.", "marker": "^"}, 
     {"color": "#d62728", "linestyle": ":", "marker": "D"},   
 ]
+
+
+def approx_scientific_notation(value: float) -> str:
+    """Format a float in approximate scientific notation. E.g. 0.00234 => 2e-3."""
+    formatted = f"{value:.0e}"
+    if "e" in formatted:
+        base, exp = formatted.split("e")
+        exp = exp.lstrip("+0") or "0"
+        return f"{base}e{exp}"
+    return formatted
 
 
 def plot_in_time(
@@ -137,8 +148,9 @@ def plot_multi_dataset_pdf(
     ds_dict: dict[str, xr.Dataset],
     var_name: str,
     target_height: float | None = None,
-    bins: int = 50,
-    style: list[dict[str,str]] = DATASET_STYLES
+    bins: int | str = "fd",
+    style: list[dict[str,str]] = DATASET_STYLES,
+    density: bool = True
 ):
     """
     Plots Probability Density Functions (PDFs) of a specified variable across 4 datasets.
@@ -178,8 +190,9 @@ def plot_multi_dataset_pdf(
 
         # Compute empirical PDF step-histogram
         counts, bin_edges = np.histogram(
-            extracted_vals, bins=bins, density=True
+            extracted_vals, bins=bins, density=density
         )
+        n_bins = len(bin_edges) - 1
         bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
 
         ax.plot(
@@ -188,7 +201,7 @@ def plot_multi_dataset_pdf(
             color=ds_style["color"],
             linestyle=ds_style["linestyle"],
             linewidth=2,
-            label=f"{name}",
+            label=f"{name}, bins={n_bins}",
         )
 
     ax.set_xlabel(f"{var_name}", fontsize=11)
@@ -226,13 +239,20 @@ def plot_Ri_vs_stability_function(
         # Sort along Ri axis to guarantee clean line rendering
         sort_idx = np.argsort(ri_plot)
 
+        # Write down labels for legend
+        if "fm" in target_var:
+            label_text = fr"{name}, $\epsilon = {approx_scientific_notation(reference_height/SITE_CONFIGS[name].roughness_length_momentum)}$ " + \
+                                 fr"$\alpha = {approx_scientific_notation(SITE_CONFIGS[name].roughness_length_momentum/SITE_CONFIGS[name].roughness_length_heat)}$" 
+        else:
+            label_text = fr"{name}, $\epsilon_t = {approx_scientific_notation(reference_height/SITE_CONFIGS[name].roughness_length_heat)}$ " + \
+                                 fr"$\alpha = {approx_scientific_notation(SITE_CONFIGS[name].roughness_length_momentum/SITE_CONFIGS[name].roughness_length_heat)}$" 
         ax.plot(
             ri_plot[sort_idx],
             f_plot[sort_idx],
             color=ds_style["color"],
             linestyle=ds_style["linestyle"],
             linewidth=2,
-            label=f"{name}",
+            label=label_text,
         )
 
     y_label_str = fr"$f_m(z/L)_{{{int(reference_height)}}}$" if "fm" in target_var else fr"$f_h(z/L)_{{{int(reference_height)}}}$"
