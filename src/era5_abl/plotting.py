@@ -121,14 +121,14 @@ def plot_abl_top_vs_surface_scatter_contour(
             levels=4,
             linewidths=1.5,
             linestyles=ds_style["linestyle"],
-            label=f"{name}",
-        )
+            cut=0,                          # cut=0 takes out contour artifact near zero. Note: this is an ok approximation since we only want
+            clip=((0, None), (None, None)), # a qualitative indication of the cluster, but shouldn't be used to estimate the probability
+        )                                   # density near U=0 quantiatively!
         handle = Line2D(
             [],[], color=ds_style["color"], linestyle=ds_style["linestyle"],
             label=f"{name} (n={len(y_val)})"
         )
         legend_handles.append(handle)
-
 
     ax.set_xlabel("Wind Speed at BLH [m/s]", fontsize=11)
     ax.set_ylabel(
