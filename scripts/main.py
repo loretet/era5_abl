@@ -36,14 +36,14 @@ MIN_VALID_FRACTION = 0.8
 SMOOTH_WINDOW = 3
 # Reference height for some transfer functions/stability computations:
 REFERENCE_HEIGHT = 20.0
-
+# Number of levels with Ri higher than 0.25 to compute BLH
+RIb_PERSISTENCE = 5
 
 #%% Retrieve ERA5 data
 era.parallel_retrieval(
     dates=DATES,
     output_dir=DATA_DIR,
     max_workers=4,
-    surface_variables="2m_dewpoint_temperature",
     retrieve_srf_data=SRF_DATA_RETRIEVAL,
     retrieve_ml_data=ML_DATA_RETRIEVAL,
 )
@@ -77,7 +77,7 @@ for loc, site in SITE_CONFIGS.items():
     # Stability filtering
     ds_ml_f1 = era.compute_grad_Ri(ds_ml_f1)
     ds_ml_f1 = era.compute_bulk_Ri(ds_ml_f1)
-    ds_ml_f1 = era.compute_BLH_from_Ri_b(ds_ml_f1, Ri_c=RI_C)
+    ds_ml_f1 = era.compute_BLH_from_Ri_b(ds_ml_f1, Ri_c=RI_C, persistence=RIb_PERSISTENCE)
     ds_ml_f2, ds_srf_f2 = era.filter_stability(ds_ml_f1, ds_srf_f1,
         ri_surface_min=0.0, grad_tol=GRAD_TOL,
         min_valid_fraction=MIN_VALID_FRACTION, smooth_window=SMOOTH_WINDOW,
