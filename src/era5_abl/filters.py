@@ -129,9 +129,9 @@ def save_filtered_dataset(
     'filter_params' dictionary.
     """
 
-    if dataset_type not in {"ml", "srf"}:
+    if dataset_type not in {"lvls", "srf"}:
         raise ValueError(
-            "dataset_type must be either 'ml' or 'srf'."
+            "dataset_type must be either 'lvls' or 'srf'."
         )
 
     output_dir = Path(output_dir)
@@ -149,11 +149,8 @@ def save_filtered_dataset(
     # Add each filtering parameter as a separate NetCDF attribute
     for key, value in filter_params.items():
         ds_out.attrs[f"filter_{key}"] = value
-    site_name = location.replace(" ", "")
-    if dataset_type == "ml":
-        filename = f"{site_name}_lvls_filtered.nc"
-    else:
-        filename = f"{site_name}_srf_filtered.nc"
+    site_name = location.replace(" ", "") 
+    filename = f"{site_name}_{dataset_type}_filtered.nc"
 
     output_path = output_dir / filename
     ds_out.to_netcdf(output_path)
