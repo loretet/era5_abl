@@ -61,7 +61,7 @@ def plot_in_time(
     plt.grid(True, linestyle="--", alpha=0.6)
     if N > 1:
         plt.legend()
-    plt.title(f"Vertical Profile Evolution: {var_name}")
+    plt.title(f"Vertical profile evolution: {var_name}")
 
     return fig
 
@@ -131,12 +131,12 @@ def plot_abl_top_vs_surface_scatter_contour(
         )
         legend_handles.append(handle)
 
-    ax.set_xlabel("Wind Speed at BLH [m/s]", fontsize=11)
+    ax.set_xlabel("Wind speed at BLH [m/s]", fontsize=11)
     ax.set_ylabel(
         f"$\Delta {temp_var.upper()}$ (ABL Top - Surface) [K]", fontsize=11
     )
     ax.set_title(
-        "ABL Top Wind Speed vs. Temperature Difference across Locations",
+        "Top-of-the-ABL wind speed vs. Temperature difference",
         fontsize=12,
     )
     ax.grid(True, linestyle="--", alpha=0.5)
@@ -206,8 +206,8 @@ def plot_multi_dataset_pdf(
         )
 
     ax.set_xlabel(f"{var_name}", fontsize=11)
-    ax.set_ylabel("Probability Density", fontsize=11)
-    ax.set_title(f"PDF Comparison: {var_name}{height_str}", fontsize=12)
+    ax.set_ylabel("PDF", fontsize=11)
+    ax.set_title(f"PDF comparison: {var_name}{height_str}", fontsize=12)
     ax.grid(True, linestyle="--", alpha=0.5)
     ax.legend(loc="best")
     plt.tight_layout()
@@ -375,7 +375,7 @@ def plot_vertical_profile(
                 color=ds_style["color"],
                 linestyle=ds_style["linestyle"],
                 linewidth=2,
-                label=f"{name} (Time Mean)",
+                label=f"{name} (Time mean)",
             )
 
     # Adding a colorbar for the time range case
@@ -389,11 +389,11 @@ def plot_vertical_profile(
     title_suffix = (
         f" at t = {time}"
         if time
-        else (f" (Range: {time_range})" if time_range else " (Time Mean)")
+        else (f" (Range: {time_range})" if time_range else " (Time mean)")
     )
     ax.set_xlabel(f"{var_name}", fontsize=11)
     ax.set_ylabel("Height AGL $z$ [m]", fontsize=11)
-    ax.set_title(f"Vertical Profile: {var_name}{title_suffix}", fontsize=12)
+    ax.set_title(f"Vertical profile: {var_name}{title_suffix}", fontsize=12)
     ax.grid(True, linestyle="--", alpha=0.5)
     ax.legend(loc="best")
     plt.tight_layout()
@@ -475,7 +475,7 @@ def plot_abl_top_vs_surface_hexbin(
         # Colorbar for this dataset
         cbar = fig.colorbar(hb, ax=ax)
         cbar.set_label("Number of observations")
-        ax.set_xlabel("Wind Speed at BLH [m/s]", fontsize=11)
+        ax.set_xlabel("Wind speed at BLH [m/s]", fontsize=11)
         ax.set_ylabel(f"$\\Delta {temp_var.upper()}$ (ABL Top - Surface) [K]",fontsize=11)
         ax.set_title(f"{name} (n={len(y_val)})", fontsize=12)
         ax.set_xlim(left=0)
@@ -485,7 +485,7 @@ def plot_abl_top_vs_surface_hexbin(
     for idx in range(n_datasets, len(axes)):
         axes[idx].remove()
     fig.suptitle(
-        "ABL Top Wind Speed vs. Temperature Difference",
+        "Top-of-the-ABL wind speed vs. Temperature difference",
         fontsize=14,
     )
     plt.tight_layout()
