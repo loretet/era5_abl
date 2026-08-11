@@ -25,7 +25,7 @@ def plot_in_time(
     Plots vertical profiles of var_name against height AGL (z) across time.
     Uses predefined dataset styles for consistent line and marker aesthetics.
     """
-    time_dim = "valid_time" if "valid_time" in ds.dims else "time"
+    time_dim = "valid_time" if "valid_time" in ds.sizes else "time"
     times = ds[time_dim].values
     N = len(times)
 
@@ -75,7 +75,7 @@ def plot_abl_top_vs_surface_scatter_contour(
         ).values
 
         # 2. Extract Wind Speed at BLH for each timestep
-        n_times = ds.dims["time"]
+        n_times = ds.sizes["time"]
         u_blh = np.zeros(n_times)
 
         for t in range(n_times):
@@ -149,7 +149,7 @@ def plot_multi_dataset_pdf(
         data_array = ds[var_name]
 
         # Check if variable depends on vertical model levels
-        if "model_level" in data_array.dims:
+        if "model_level" in data_array.sizes:
             if target_height is None:
                 raise ValueError(
                     f"Variable '{var_name}' varies with model level. You must specify 'target_height' [m AGL]."
