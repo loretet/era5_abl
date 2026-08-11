@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
-from matplotlib.lines import Line2D    
+from matplotlib.lines import Line2D   
+from matplotlib.colors import LinearSegmentedColormap
 from .operations import interpolate_to_height
 from .stability import compute_difference_surface_top_ABL
 from .config import SITE_CONFIGS
@@ -398,3 +399,95 @@ def plot_vertical_profile(
     plt.tight_layout()
 
     return fig, ax
+
+def plot_abl_top_vs_surface_hexbin(
+    ds_dict: dict[str, xr.Dataset],
+    ds_srf_dict: dict[str, xr.Dataset],
+    temp_var: str = "t",
+    style: list[dict[str, str]] = DATASET_STYLES,
+    gridsize: int = 40,
+):
+    """
+    Plots hexbin distributions of Delta T (ABL Top - Surface)
+    vs. Wind Speed at the ABL Top.
+    One subplot is created for each dataset.
+    """
+
+    n_datasets = len(ds_dict)
+
+    # Smallest square grid that contains all datasets
+    N = int(np.ceil(np.sqrt(n_datasets)))
+    fig, axes = plt.subplots(N, N, figsize=(6 * N, 5 * N), squeeze=False)
+
+    axes = axes.flatten()
+
+    for idx, (name, ds) in enumerate(ds_dict.items()):
+        ax = axes[idx]
+        ds_style = style[idx % len(style)]
+        ds_srf = ds_srf_dict[name]
+
+        # Compute Temperature Difference (ABL Top - Surface)
+        delta_T = compute_difference_surface_top_ABL(
+            ds,
+            ds_srf,
+            var_name=temp_var
+        ).values
+
+        # Extract Wind Speed at BLH for each timestep
+        n_times = ds.sizes["time"]
+        u_blh = np.zeros(n_times)
+
+        for t in range(n_times):
+            z_t = ds["z"].isel(time=t).values
+            blh_t = ds_srf["blh"].isel(time=t).values
+            k_idx = np.abs(z_t - blh_t).argmin()
+            u_blh[t] = ds["wind_speed"].isel(
+                time=t,
+                model_level=k_idx,
+            ).values
+
+        # Filter NaN / Inf values
+        valid_mask = (
+            np.isfinite(u_blh)
+            & np.isfinite(delta_T)
+        )
+        x_val = u_blh[valid_mask]
+        y_val = delta_T[valid_mask]
+
+        # Dataset-specific colormap:
+        # low density -> white
+        # high density -> DATASET_STYLES color
+        cmap = LinearSegmentedColormap.from_list(
+            f"{name}_cmap",
+            ["white", ds_style["color"]],
+        )
+
+        # Hexbin distribution
+        hb = ax.hexbin(
+            x_val,
+            y_val,
+            gridsize=gridsize,
+            mincnt=1,
+            bins="log",
+            cmap=cmap,
+        )
+
+        # Colorbar for this dataset
+        cbar = fig.colorbar(hb, ax=ax)
+        cbar.set_label("Number of observations")
+        ax.set_xlabel("Wind Speed at BLH [m/s]", fontsize=11)
+        ax.set_ylabel(f"$\\Delta {temp_var.upper()}$ (ABL Top - Surface) [K]",fontsize=11)
+        ax.set_title(f"{name} (n={len(y_val)})", fontsize=12)
+        ax.set_xlim(left=0)
+        ax.grid(True, linestyle="--", alpha=0.3)
+
+    # Remove unused panels if number of datasets is not a perfect square
+    for idx in range(n_datasets, len(axes)):
+        axes[idx].remove()
+    fig.suptitle(
+        "ABL Top Wind Speed vs. Temperature Difference",
+        fontsize=14,
+    )
+    plt.tight_layout()
+
+    return fig, axes

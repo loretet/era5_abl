@@ -10,11 +10,12 @@ from era5_abl.config import SITE_CONFIGS
 from era5_abl.plotting import (plot_multi_dataset_pdf,
     plot_abl_top_vs_surface_scatter_contour,
     plot_Ri_vs_stability_function,
-    plot_vertical_profile
+    plot_vertical_profile,
+    plot_abl_top_vs_surface_hexbin
 )
 import xarray as xr
 
-# %% User configuration
+#%% User configuration
 
 # Directory with data:
 DATA_DIR = Path(
@@ -83,7 +84,7 @@ if FILTER_DATASETS:
 
         # Stability filtering
         ds_ml_f1 = era.compute_grad_Ri(ds_ml_f1)
-        ds_ml_f1 = era.compute_bulk_Ri(ds_ml_f1)
+        ds_ml_f1 = era.compute_bulk_Ri(ds_ml_f1, ds_srf_f1, reference_height=None)
         ds_ml_f1 = era.compute_BLH_from_Ri_b(ds_ml_f1, Ri_c=filter_params["Ri_c"], persistence=RIb_PERSISTENCE)
         ds_ml_f2, ds_srf_f2 = era.filter_stability(ds_ml_f1, ds_srf_f1,
             ri_surf_min=filter_params["ri_surf_min"], ri_surf_min_height=filter_params["ri_surf_min_height"], 
@@ -157,23 +158,37 @@ else:
 
 # %% Plotting & Analysis
 # Example 1 (time variable): PDF comparison of BLH across locations and ocmpare to diagnosed one
-plot_multi_dataset_pdf(ds_ml_dict, var_name="BLH_Ri", bins=40) 
-plot_multi_dataset_pdf(ds_srf_dict, var_name="blh", bins=40)    
+plot_multi_dataset_pdf(ds_ml_dict, var_name="BLH_Ri", bins="fd", density=True) 
+_,ax=plot_multi_dataset_pdf(ds_srf_dict, var_name="blh", bins="fd", density=True)    
+ax.set_xlim(left=0,right=2000)
 
-# Example 2 (time-height variable): PDF comparison of Theta_v at 100m AGL
-plot_multi_dataset_pdf(ds_ml_dict, var_name="Ri_g", target_height=100.0, bins=50)
+# Example 2 (time-height variable): PDF comparison 
+_,ax=plot_multi_dataset_pdf(ds_ml_dict, var_name="Ri_g", target_height=20.0, bins="fd", density=True)
+ax.set_xlim(left=0,right=0.5)
+# ax.set_ylim(top=5,bottom=0.0)
 
 # Example 3: Scatter/KDE of Delta T vs Wind speed at BLH
-plot_abl_top_vs_surface_scatter_contour(ds_ml_dict, ds_srf_dict, temp_var="theta_v")
+_,ax=plot_abl_top_vs_surface_scatter_contour(ds_ml_dict, ds_srf_dict, temp_var="theta_v")
+ax.axhline(0.0,c="k",alpha=0.8)
 
-# Example 4: Stability correction function curves
-plot_Ri_vs_stability_function(ds_ml_dict, func_type="fm", reference_height=REFERENCE_HEIGHT)
+# Example 4: Hexbin plot showing the toa-surface difference for every location separately
+_,ax = plot_abl_top_vs_surface_hexbin(ds_ml_dict, ds_srf_dict, temp_var="theta_v", gridsize=40)
 
-# Example 5: Single timestamp vertical profile
+# Example 5: Stability correction function curves
+_,ax = plot_Ri_vs_stability_function(ds_ml_dict, target_var="fm_20", reference_height=REFERENCE_HEIGHT)
+ax.set_ylim(top=1.0,bottom=0.0)
+ax.set_xlim(left=0.0,right=0.5)
+_,ax = plot_Ri_vs_stability_function(ds_ml_dict, target_var="fh_20", reference_height=REFERENCE_HEIGHT)
+ax.set_ylim(top=1.0,bottom=0.0)
+ax.set_xlim(left=0.0,right=0.5)  
+
+# Example 6: Single timestamp vertical profile
 plot_vertical_profile(ds_ml_dict, "theta_v", time="2020-07-15T12:00:00")
 
-# Example 6: Time-Range variable profile sequence 
-plot_vertical_profile(ds_ml_dict, "Ri_g", time_range=("2020-07-15T06:00:00", "2020-07-25T12:00:00"))
-
+# Example 7: Time-Range variable profile sequence 
+# Create one-entry dict to oplot only one location (can also be used with the entire dictionary, but might be confusing)
+target_loc = "Mace Head"  
+dict_from_loc = {target_loc: ds_ml_dict[target_loc]} 
+plot_vertical_profile(dict_from_loc, "theta_v", time_range=("2020-07-15T06:00:00", "2020-07-25T12:00:00"))
 
 #%%
