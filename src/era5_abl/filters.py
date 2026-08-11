@@ -1,6 +1,8 @@
 import xarray as xr
 import numpy as np
 from .operations import interpolate_to_height
+from pathlib import Path
+from datetime import datetime, timezone
 
 
 def filter_clouds(ds: xr.Dataset, ds_srf: xr.Dataset, lcc_thresh: float = 0.1, window_hours: int = 2) -> tuple[xr.Dataset, xr.Dataset]:
@@ -22,8 +24,8 @@ def filter_clouds(ds: xr.Dataset, ds_srf: xr.Dataset, lcc_thresh: float = 0.1, w
 
     return ds_ml_filtered, ds_srf_filtered
 
-def filter_stability(ds: xr.Dataset, ds_srf: xr.Dataset, ri_surface_min: float = 0.0, 
-                     grad_tol: float = -2e-4, min_valid_fraction: float = 0.8, 
+def filter_stability(ds: xr.Dataset, ds_srf: xr.Dataset, ri_surf_min: float = 0.0, 
+                     ri_surf_min_height: float = 20.0, grad_tol: float = -2e-4, min_valid_fraction: float = 0.8, 
                      smooth_window: int = 3
                      ) -> tuple[xr.Dataset, xr.Dataset]:
     """
@@ -34,8 +36,8 @@ def filter_stability(ds: xr.Dataset, ds_srf: xr.Dataset, ri_surface_min: float =
     """
 
     # Get surface quantities
-    ri_20m = interpolate_to_height(ds,"Ri_g", None, 20.0)
-    mask_surf = (ri_20m >= ri_surface_min)
+    ri_20m = interpolate_to_height(ds,"Ri_g", None, ri_surf_min_height)
+    mask_surf = (ri_20m >= ri_surf_min)
 
     # Smooth out theta nad compute gradient
     theta_smooth = ds.theta_v.rolling(model_level = smooth_window, 
@@ -116,3 +118,45 @@ def print_filter_output(ds_initial: xr.Dataset, ds_filtered: xr.Dataset, step_na
         "n_filtered": n_filtered,
         "percentage": pct,
     }
+
+def save_filtered_dataset(
+    ds: xr.Dataset, location: str,
+    dataset_type: str, output_dir: str | Path,
+    filter_params: dict,
+) -> Path:
+    """
+    Save a filtered ERA5 dataset to NetCDF with filtering metadata via the
+    'filter_params' dictionary.
+    """
+
+    if dataset_type not in {"ml", "srf"}:
+        raise ValueError(
+            "dataset_type must be either 'ml' or 'srf'."
+        )
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # General info
+    ds_out = ds.copy()
+    ds_out.attrs.update({
+        "location": location,
+        "dataset_type": dataset_type,
+        "filtering_applied": "cloud, stability, wind_direction",
+        "date_saved_utc": datetime.now(timezone.utc).isoformat(),
+    })
+
+    # Add each filtering parameter as a separate NetCDF attribute
+    for key, value in filter_params.items():
+        ds_out.attrs[f"filter_{key}"] = value
+    site_name = location.replace(" ", "")
+    if dataset_type == "ml":
+        filename = f"{site_name}_lvls_filtered.nc"
+    else:
+        filename = f"{site_name}_srf_filtered.nc"
+
+    output_path = output_dir / filename
+    ds_out.to_netcdf(output_path)
+
+    print(f"Saved filtered dataset: {output_path}")
+    return output_path
