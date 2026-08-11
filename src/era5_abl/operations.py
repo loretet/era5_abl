@@ -9,8 +9,8 @@ def compute_BLH_from_Ri_b(ds: xr.Dataset, Ri_c: float = 0.25, z_min: float = 20.
                           z_max: float | None = 3000.0, persistence: int = 2
                           ) -> xr.Dataset:
     """
-    Computes the boundary layer height (BLH) from the first upward crossing of Ri_bulk = Ri_c.
-    persistence=int means the threshold must remain exceeded for at least X consecutive model levels.    
+    Computes the boundary layer height (BLH) from the first upward crossing of Ri_bulk = Ri_c (Ri_b computed wrt surface level).
+    'persistence' means the threshold must remain exceeded for at least 'persistence' consecutive model levels.    
     """
 
     # Initiate BLH array
@@ -21,7 +21,7 @@ def compute_BLH_from_Ri_b(ds: xr.Dataset, Ri_c: float = 0.25, z_min: float = 20.
     fail_count = 0
     for t in range(n_times):
         z = ds["z"].isel(time=t).values
-        Ri = ds["Ri_b"].isel(time=t).values
+        Ri = ds["Ri_b_srf"].isel(time=t).values
         # only considers values within the heights of choice
         z_mask = (z > z_min)
         if z_max is not None:
@@ -70,7 +70,7 @@ def compute_wind_dir(ds: xr.Dataset) -> xr.Dataset:
 
     return ds
 
-def interpolate_to_height(ds: xr.Dataset, var_name: str, ds_srf: xr.Dataset = None, target_height: float = None) -> xr.DataArray:
+def interpolate_to_height(ds: xr.Dataset, var_name: str, ds_srf: xr.Dataset = None, target_height: None | float = 20.0) -> xr.DataArray:
     """
     Linearly interpolate var_name to a constant physical height or to the time-dependent BLH.
     If target_height is None, interpolates to BLH. Otherwise interpolates to the specified height.

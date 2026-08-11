@@ -96,7 +96,7 @@ def plot_abl_top_vs_surface_scatter_contour(
             x_val,
             y_val,
             color=ds_style["color"],
-            alpha=0.05,
+            alpha=0.01,
             s=20,
             edgecolors="none",
         )
@@ -202,23 +202,20 @@ def plot_multi_dataset_pdf(
 
 
 def plot_Ri_vs_stability_function(
-    ds_dict: dict[str, xr.Dataset], func_type: str = "fm",
+    ds_dict: dict[str, xr.Dataset], target_var: str = "fm",
     reference_height: float = 20.0, style: list[dict[str,str]] = DATASET_STYLES
 ):
     """
-    Plots Gradient Richardson Number on the y-axis against the GL18 stability
-
-    functions f_m or f_h on the x-axis for all four datasets.
+    Plots Bulk Richardson Number on the x-axis against the GL18 normalised
+    transfer coefficients f_m or f_h on the y-axis for all four datasets.
     """
     fig, ax = plt.subplots(figsize=(8, 6))
-
-    target_var = "fm" if func_type == "fm" else "fh"
 
     for idx, (name, ds) in enumerate(ds_dict.items()):
         ds_style = style[idx % len(style)]
 
         # Extract Ri at reference_height and stability function arrays
-        ri_ref = interpolate_to_height(ds, "Ri_g", None, reference_height).values.flatten()
+        ri_ref = interpolate_to_height(ds, "Ri_b_srf", target_height=reference_height).values.flatten()
         f_val = ds[target_var].values.flatten()
 
         # Filter to valid stable regime (Ri >= 0)
@@ -230,19 +227,19 @@ def plot_Ri_vs_stability_function(
         sort_idx = np.argsort(ri_plot)
 
         ax.plot(
-            f_plot[sort_idx],
             ri_plot[sort_idx],
+            f_plot[sort_idx],
             color=ds_style["color"],
             linestyle=ds_style["linestyle"],
             linewidth=2,
             label=f"{name}",
         )
 
-    x_label_str = "$f_m(z/L)$" if func_type == "fm" else "$f_h(z/L)$"
-    ax.set_xlabel(f"Stability Correction Factor {x_label_str}", fontsize=11)
-    ax.set_ylabel(fr"Gradient Richardson Number $Ri_{int(reference_height)}$", fontsize=11)
+    y_label_str = fr"$f_m(z/L)_{{{int(reference_height)}}}$" if "fm" in target_var else fr"$f_h(z/L)_{{{int(reference_height)}}}$"
+    ax.set_ylabel(fr"Normalised transfer coefficient {y_label_str}", fontsize=11)
+    ax.set_xlabel(fr"Bulk Richardson $Ri_{{{int(reference_height)}}}$", fontsize=11)
     ax.set_title(
-        f"Surface Layer Stability Function ({x_label_str}) vs. $Ri_{int(reference_height)}$",
+        fr"Normalised transfer coefficient ({y_label_str}) vs. $Ri_{{{int(reference_height)}}}$",
         fontsize=12,
     )
     ax.grid(True, linestyle="--", alpha=0.5)

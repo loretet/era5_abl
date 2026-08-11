@@ -18,7 +18,7 @@ def compute_epsilon(location: str, reference_height: float = 20.0,) -> tuple[flo
 def compute_zeta_GL18(ds: xr.Dataset, epsilon: float, epsilon_t: float, reference_height: float) -> xr.Dataset:
     """
     Computes the atmospheric stability parameter zeta (z/L) from Eq. 21 of Gryanik & Lüpkes 2018 (GL18).
-    Considers z at reference_height. NB: ONLY valid for Ri >= 0! NB2: They used 10 m as reference height
+    Considers z at reference_height. NB: ONLY valid for Ri_b >= 0! NB2: They used 10 m as reference height
     """
     ln_eps = np.log(epsilon)
     ln_epst = np.log(epsilon_t)
@@ -32,7 +32,7 @@ def compute_zeta_GL18(ds: xr.Dataset, epsilon: float, epsilon_t: float, referenc
     bracket = (B**2) / C - A
 
     # Extract (interpolate) Ri at z = reference_height AGL per timestep
-    Ri_ref = interpolate_to_height(ds, "Ri_g", None, reference_height)
+    Ri_ref = interpolate_to_height(ds, "Ri_b_srf", None, reference_height)
 
     Ri_ref_pos = np.maximum(Ri_ref, 0.0)  # Restrict to positive Ri (enutral/stable)
     zeta = (coeff_linear * Ri_ref_pos) + (
