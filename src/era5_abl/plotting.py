@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
+from matplotlib.lines import Line2D    
 from .operations import interpolate_to_height
 from .stability import compute_difference_surface_top_ABL
 
@@ -65,6 +66,7 @@ def plot_abl_top_vs_surface_scatter_contour(
     """
     fig, ax = plt.subplots(figsize=(9, 7))
 
+    legend_handles = []
     for idx, (name, ds) in enumerate(ds_dict.items()):
         ds_style = style[idx % len(style)]
         ds_srf = ds_srf_dict[name]
@@ -94,7 +96,7 @@ def plot_abl_top_vs_surface_scatter_contour(
             x_val,
             y_val,
             color=ds_style["color"],
-            alpha=0.25,
+            alpha=0.05,
             s=20,
             edgecolors="none",
         )
@@ -110,6 +112,12 @@ def plot_abl_top_vs_surface_scatter_contour(
             linestyles=ds_style["linestyle"],
             label=f"{name}",
         )
+        handle = Line2D(
+            [],[], color=ds_style["color"], linestyle=ds_style["linestyle"],
+            label=f"{name} (n={len(y_val)})"
+        )
+        legend_handles.append(handle)
+
 
     ax.set_xlabel("Wind Speed at BLH [m/s]", fontsize=11)
     ax.set_ylabel(
@@ -120,7 +128,7 @@ def plot_abl_top_vs_surface_scatter_contour(
         fontsize=12,
     )
     ax.grid(True, linestyle="--", alpha=0.5)
-    ax.legend(loc="best")
+    ax.legend(loc="best", handles=legend_handles)
     plt.tight_layout()
 
     return fig, ax
