@@ -154,7 +154,7 @@ def compare_diagnosed_and_era5_blh(ds_ml: xr.Dataset, ds_srf: xr.Dataset) -> Non
         ).values,
     )
 
-def compute_thetav(ds: xr.Dataset):
+def compute_thetav(ds: xr.Dataset) -> xr.Dataset:
     """
     Computes virtual potential temperature (theta_v) from a model-level dataset 
     containing pressure and humidity. Distinguishes between surface and model level datasets.
@@ -169,10 +169,10 @@ def compute_thetav(ds: xr.Dataset):
         # Computes virtual potential temperature
         theta_v = t_v * (P0 / ds["pressure"]) ** gamma
         # Assign to dataset
-        ds = ds.assign(theta_v=(("time", "model_level"), theta_v))
+        ds = ds.assign(theta_v=(("time", "model_level"), theta_v.data))
     else:
         # Compute vapor pressure from dew-point temperature (Magnus approx.)
-        T, Td, p = ds["t2m"], ds["d2m"], ds["sp"]
+        T, Td, p = ds["t2m"], ds["2d"], ds["sp"]
         e = 611.2 * np.exp(17.67 * (Td - 273.15)/ (Td - 29.65))
         # Compute sspecific humidity
         eps = 0.622
