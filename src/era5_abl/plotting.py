@@ -4,8 +4,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
+from matplotlib.lines import Line2D   
+from matplotlib.colors import LinearSegmentedColormap
 from .operations import interpolate_to_height
 from .stability import compute_difference_surface_top_ABL
+from .config import SITE_CONFIGS
 
 
 DATASET_STYLES = [
@@ -14,6 +17,16 @@ DATASET_STYLES = [
     {"color": "#2ca02c", "linestyle": "-.", "marker": "^"}, 
     {"color": "#d62728", "linestyle": ":", "marker": "D"},   
 ]
+
+
+def approx_scientific_notation(value: float) -> str:
+    """Format a float in approximate scientific notation. E.g. 0.00234 => 2e-3."""
+    formatted = f"{value:.0e}"
+    if "e" in formatted:
+        base, exp = formatted.split("e")
+        exp = exp.lstrip("+0") or "0"
+        return f"{base}e{exp}"
+    return formatted
 
 
 def plot_in_time(
@@ -25,7 +38,7 @@ def plot_in_time(
     Plots vertical profiles of var_name against height AGL (z) across time.
     Uses predefined dataset styles for consistent line and marker aesthetics.
     """
-    time_dim = "valid_time" if "valid_time" in ds.dims else "time"
+    time_dim = "valid_time" if "valid_time" in ds.sizes else "time"
     times = ds[time_dim].values
     N = len(times)
 
@@ -48,7 +61,7 @@ def plot_in_time(
     plt.grid(True, linestyle="--", alpha=0.6)
     if N > 1:
         plt.legend()
-    plt.title(f"Vertical Profile Evolution: {var_name}")
+    plt.title(f"Vertical profile evolution: {var_name}")
 
     return fig
 
@@ -65,6 +78,7 @@ def plot_abl_top_vs_surface_scatter_contour(
     """
     fig, ax = plt.subplots(figsize=(9, 7))
 
+    legend_handles = []
     for idx, (name, ds) in enumerate(ds_dict.items()):
         ds_style = style[idx % len(style)]
         ds_srf = ds_srf_dict[name]
@@ -75,7 +89,7 @@ def plot_abl_top_vs_surface_scatter_contour(
         ).values
 
         # 2. Extract Wind Speed at BLH for each timestep
-        n_times = ds.dims["time"]
+        n_times = ds.sizes["time"]
         u_blh = np.zeros(n_times)
 
         for t in range(n_times):
@@ -94,7 +108,7 @@ def plot_abl_top_vs_surface_scatter_contour(
             x_val,
             y_val,
             color=ds_style["color"],
-            alpha=0.25,
+            alpha=0.01,
             s=20,
             edgecolors="none",
         )
@@ -108,19 +122,25 @@ def plot_abl_top_vs_surface_scatter_contour(
             levels=4,
             linewidths=1.5,
             linestyles=ds_style["linestyle"],
-            label=f"{name}",
+            cut=0,                          # cut=0 takes out contour artifact near zero. Note: this is an ok approximation since we only want
+            clip=((0, None), (None, None)), # a qualitative indication of the cluster, but shouldn't be used to estimate the probability
+        )                                   # density near U=0 quantiatively!
+        handle = Line2D(
+            [],[], color=ds_style["color"], linestyle=ds_style["linestyle"],
+            label=f"{name} (n={len(y_val)})"
         )
+        legend_handles.append(handle)
 
-    ax.set_xlabel("Wind Speed at BLH [m/s]", fontsize=11)
+    ax.set_xlabel("Wind speed at BLH [m/s]", fontsize=11)
     ax.set_ylabel(
         f"$\Delta {temp_var.upper()}$ (ABL Top - Surface) [K]", fontsize=11
     )
     ax.set_title(
-        "ABL Top Wind Speed vs. Temperature Difference across Locations",
+        "Top-of-the-ABL wind speed vs. Temperature difference",
         fontsize=12,
     )
     ax.grid(True, linestyle="--", alpha=0.5)
-    ax.legend(loc="best")
+    ax.legend(loc="best", handles=legend_handles)
     plt.tight_layout()
 
     return fig, ax
@@ -129,8 +149,9 @@ def plot_multi_dataset_pdf(
     ds_dict: dict[str, xr.Dataset],
     var_name: str,
     target_height: float | None = None,
-    bins: int = 50,
-    style: list[dict[str,str]] = DATASET_STYLES
+    bins: int | str = "fd",
+    style: list[dict[str,str]] = DATASET_STYLES,
+    density: bool = True
 ):
     """
     Plots Probability Density Functions (PDFs) of a specified variable across 4 datasets.
@@ -149,7 +170,7 @@ def plot_multi_dataset_pdf(
         data_array = ds[var_name]
 
         # Check if variable depends on vertical model levels
-        if "model_level" in data_array.dims:
+        if "model_level" in data_array.sizes:
             if target_height is None:
                 raise ValueError(
                     f"Variable '{var_name}' varies with model level. You must specify 'target_height' [m AGL]."
@@ -170,8 +191,9 @@ def plot_multi_dataset_pdf(
 
         # Compute empirical PDF step-histogram
         counts, bin_edges = np.histogram(
-            extracted_vals, bins=bins, density=True
+            extracted_vals, bins=bins, density=density
         )
+        n_bins = len(bin_edges) - 1
         bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
 
         ax.plot(
@@ -180,12 +202,12 @@ def plot_multi_dataset_pdf(
             color=ds_style["color"],
             linestyle=ds_style["linestyle"],
             linewidth=2,
-            label=f"{name}",
+            label=f"{name}, bins={n_bins}",
         )
 
     ax.set_xlabel(f"{var_name}", fontsize=11)
-    ax.set_ylabel("Probability Density", fontsize=11)
-    ax.set_title(f"PDF Comparison: {var_name}{height_str}", fontsize=12)
+    ax.set_ylabel("PDF", fontsize=11)
+    ax.set_title(f"PDF comparison: {var_name}{height_str}", fontsize=12)
     ax.grid(True, linestyle="--", alpha=0.5)
     ax.legend(loc="best")
     plt.tight_layout()
@@ -194,23 +216,20 @@ def plot_multi_dataset_pdf(
 
 
 def plot_Ri_vs_stability_function(
-    ds_dict: dict[str, xr.Dataset], func_type: str = "fm",
+    ds_dict: dict[str, xr.Dataset], target_var: str = "fm",
     reference_height: float = 20.0, style: list[dict[str,str]] = DATASET_STYLES
 ):
     """
-    Plots Gradient Richardson Number on the y-axis against the GL18 stability
-
-    functions f_m or f_h on the x-axis for all four datasets.
+    Plots Bulk Richardson Number on the x-axis against the GL18 normalised
+    transfer coefficients f_m or f_h on the y-axis for all four datasets.
     """
     fig, ax = plt.subplots(figsize=(8, 6))
-
-    target_var = "fm" if func_type == "fm" else "fh"
 
     for idx, (name, ds) in enumerate(ds_dict.items()):
         ds_style = style[idx % len(style)]
 
         # Extract Ri at reference_height and stability function arrays
-        ri_ref = interpolate_to_height(ds, "Ri_g", None, reference_height).values.flatten()
+        ri_ref = interpolate_to_height(ds, "Ri_b_srf", target_height=reference_height).values.flatten()
         f_val = ds[target_var].values.flatten()
 
         # Filter to valid stable regime (Ri >= 0)
@@ -221,20 +240,27 @@ def plot_Ri_vs_stability_function(
         # Sort along Ri axis to guarantee clean line rendering
         sort_idx = np.argsort(ri_plot)
 
+        # Write down labels for legend
+        if "fm" in target_var:
+            label_text = fr"{name}, $\epsilon = {approx_scientific_notation(reference_height/SITE_CONFIGS[name].roughness_length_momentum)}$ " + \
+                                 fr"$\alpha = {approx_scientific_notation(SITE_CONFIGS[name].roughness_length_momentum/SITE_CONFIGS[name].roughness_length_heat)}$" 
+        else:
+            label_text = fr"{name}, $\epsilon_t = {approx_scientific_notation(reference_height/SITE_CONFIGS[name].roughness_length_heat)}$ " + \
+                                 fr"$\alpha = {approx_scientific_notation(SITE_CONFIGS[name].roughness_length_momentum/SITE_CONFIGS[name].roughness_length_heat)}$" 
         ax.plot(
-            f_plot[sort_idx],
             ri_plot[sort_idx],
+            f_plot[sort_idx],
             color=ds_style["color"],
             linestyle=ds_style["linestyle"],
             linewidth=2,
-            label=f"{name}",
+            label=label_text,
         )
 
-    x_label_str = "$f_m(z/L)$" if func_type == "fm" else "$f_h(z/L)$"
-    ax.set_xlabel(f"Stability Correction Factor {x_label_str}", fontsize=11)
-    ax.set_ylabel(fr"Gradient Richardson Number $Ri_{int(reference_height)}$", fontsize=11)
+    y_label_str = fr"$f_m(z/L)_{{{int(reference_height)}}}$" if "fm" in target_var else fr"$f_h(z/L)_{{{int(reference_height)}}}$"
+    ax.set_ylabel(fr"Normalised transfer coefficient {y_label_str}", fontsize=11)
+    ax.set_xlabel(fr"Bulk Richardson $Ri_{{{int(reference_height)}}}$", fontsize=11)
     ax.set_title(
-        f"Surface Layer Stability Function ({x_label_str}) vs. $Ri_{int(reference_height)}$",
+        fr"Normalised transfer coefficient ({y_label_str}) vs. $Ri_{{{int(reference_height)}}}$",
         fontsize=12,
     )
     ax.grid(True, linestyle="--", alpha=0.5)
@@ -349,7 +375,7 @@ def plot_vertical_profile(
                 color=ds_style["color"],
                 linestyle=ds_style["linestyle"],
                 linewidth=2,
-                label=f"{name} (Time Mean)",
+                label=f"{name} (Time mean)",
             )
 
     # Adding a colorbar for the time range case
@@ -363,13 +389,105 @@ def plot_vertical_profile(
     title_suffix = (
         f" at t = {time}"
         if time
-        else (f" (Range: {time_range})" if time_range else " (Time Mean)")
+        else (f" (Range: {time_range})" if time_range else " (Time mean)")
     )
     ax.set_xlabel(f"{var_name}", fontsize=11)
     ax.set_ylabel("Height AGL $z$ [m]", fontsize=11)
-    ax.set_title(f"Vertical Profile: {var_name}{title_suffix}", fontsize=12)
+    ax.set_title(f"Vertical profile: {var_name}{title_suffix}", fontsize=12)
     ax.grid(True, linestyle="--", alpha=0.5)
     ax.legend(loc="best")
     plt.tight_layout()
 
     return fig, ax
+
+def plot_abl_top_vs_surface_hexbin(
+    ds_dict: dict[str, xr.Dataset],
+    ds_srf_dict: dict[str, xr.Dataset],
+    temp_var: str = "t",
+    style: list[dict[str, str]] = DATASET_STYLES,
+    gridsize: int = 40,
+):
+    """
+    Plots hexbin distributions of Delta T (ABL Top - Surface)
+    vs. Wind Speed at the ABL Top.
+    One subplot is created for each dataset.
+    """
+
+    n_datasets = len(ds_dict)
+
+    # Smallest square grid that contains all datasets
+    N = int(np.ceil(np.sqrt(n_datasets)))
+    fig, axes = plt.subplots(N, N, figsize=(6 * N, 5 * N), squeeze=False)
+
+    axes = axes.flatten()
+
+    for idx, (name, ds) in enumerate(ds_dict.items()):
+        ax = axes[idx]
+        ds_style = style[idx % len(style)]
+        ds_srf = ds_srf_dict[name]
+
+        # Compute Temperature Difference (ABL Top - Surface)
+        delta_T = compute_difference_surface_top_ABL(
+            ds,
+            ds_srf,
+            var_name=temp_var
+        ).values
+
+        # Extract Wind Speed at BLH for each timestep
+        n_times = ds.sizes["time"]
+        u_blh = np.zeros(n_times)
+
+        for t in range(n_times):
+            z_t = ds["z"].isel(time=t).values
+            blh_t = ds_srf["blh"].isel(time=t).values
+            k_idx = np.abs(z_t - blh_t).argmin()
+            u_blh[t] = ds["wind_speed"].isel(
+                time=t,
+                model_level=k_idx,
+            ).values
+
+        # Filter NaN / Inf values
+        valid_mask = (
+            np.isfinite(u_blh)
+            & np.isfinite(delta_T)
+        )
+        x_val = u_blh[valid_mask]
+        y_val = delta_T[valid_mask]
+
+        # Dataset-specific colormap:
+        # low density -> white
+        # high density -> DATASET_STYLES color
+        cmap = LinearSegmentedColormap.from_list(
+            f"{name}_cmap",
+            ["white", ds_style["color"]],
+        )
+
+        # Hexbin distribution
+        hb = ax.hexbin(
+            x_val,
+            y_val,
+            gridsize=gridsize,
+            mincnt=1,
+            bins="log",
+            cmap=cmap,
+        )
+
+        # Colorbar for this dataset
+        cbar = fig.colorbar(hb, ax=ax)
+        cbar.set_label("Number of observations")
+        ax.set_xlabel("Wind speed at BLH [m/s]", fontsize=11)
+        ax.set_ylabel(f"$\\Delta {temp_var.upper()}$ (ABL Top - Surface) [K]",fontsize=11)
+        ax.set_title(f"{name} (n={len(y_val)})", fontsize=12)
+        ax.set_xlim(left=0)
+        ax.grid(True, linestyle="--", alpha=0.3)
+
+    # Remove unused panels if number of datasets is not a perfect square
+    for idx in range(n_datasets, len(axes)):
+        axes[idx].remove()
+    fig.suptitle(
+        "Top-of-the-ABL wind speed vs. Temperature difference",
+        fontsize=14,
+    )
+    plt.tight_layout()
+
+    return fig, axes

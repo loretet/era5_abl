@@ -56,8 +56,8 @@ ds_ml, ds_srf = eabl.prepare_dataset(
 )
 
 ds_ml = eabl.compute_grad_Ri_z(ds_ml)
-ds_ml = eabl.compute_bulk_Ri(ds_ml)
-ds_ml = eabl.compute_BLH_from_Ri_b(ds_ml)
+ds_ml = eabl.compute_bulk_Ri(ds_ml, ds_srf)
+ds_ml = eabl.compute_BLH_from_Ri_b(ds_ml, Ri_c=0.25)
 
 ds_ml, ds_srf = eabl.filter_clouds(ds_ml, ds_srf)
 ds_ml, ds_srf = eabl.filter_stability(ds_ml, ds_srf)

@@ -9,8 +9,8 @@ def compute_BLH_from_Ri_b(ds: xr.Dataset, Ri_c: float = 0.25, z_min: float = 20.
                           z_max: float | None = 3000.0, persistence: int = 2
                           ) -> xr.Dataset:
     """
-    Computes the boundary layer height (BLH) from the first upward crossing of Ri_bulk = Ri_c.
-    persistence=int means the threshold must remain exceeded for at least X consecutive model levels.    
+    Computes the boundary layer height (BLH) from the first upward crossing of Ri_bulk = Ri_c (Ri_b computed wrt surface level).
+    'persistence' means the threshold must remain exceeded for at least 'persistence' consecutive model levels.    
     """
 
     # Initiate BLH array
@@ -21,7 +21,7 @@ def compute_BLH_from_Ri_b(ds: xr.Dataset, Ri_c: float = 0.25, z_min: float = 20.
     fail_count = 0
     for t in range(n_times):
         z = ds["z"].isel(time=t).values
-        Ri = ds["Ri_b"].isel(time=t).values
+        Ri = ds["Ri_b_srf"].isel(time=t).values
         # only considers values within the heights of choice
         z_mask = (z > z_min)
         if z_max is not None:
@@ -70,7 +70,7 @@ def compute_wind_dir(ds: xr.Dataset) -> xr.Dataset:
 
     return ds
 
-def interpolate_to_height(ds: xr.Dataset, var_name: str, ds_srf: xr.Dataset = None, target_height: float = None) -> xr.DataArray:
+def interpolate_to_height(ds: xr.Dataset, var_name: str, ds_srf: xr.Dataset = None, target_height: None | float = 20.0) -> xr.DataArray:
     """
     Linearly interpolate var_name to a constant physical height or to the time-dependent BLH.
     If target_height is None, interpolates to BLH. Otherwise interpolates to the specified height.
@@ -154,7 +154,7 @@ def compare_diagnosed_and_era5_blh(ds_ml: xr.Dataset, ds_srf: xr.Dataset) -> Non
         ).values,
     )
 
-def compute_thetav(ds: xr.Dataset):
+def compute_thetav(ds: xr.Dataset) -> xr.Dataset:
     """
     Computes virtual potential temperature (theta_v) from a model-level dataset 
     containing pressure and humidity. Distinguishes between surface and model level datasets.
@@ -169,10 +169,10 @@ def compute_thetav(ds: xr.Dataset):
         # Computes virtual potential temperature
         theta_v = t_v * (P0 / ds["pressure"]) ** gamma
         # Assign to dataset
-        ds = ds.assign(theta_v=(("time", "model_level"), theta_v))
+        ds = ds.assign(theta_v=(("time", "model_level"), theta_v.data))
     else:
         # Compute vapor pressure from dew-point temperature (Magnus approx.)
-        T, Td, p = ds["t2m"], ds["d2m"], ds["sp"]
+        T, Td, p = ds["t2m"], ds["2d"], ds["sp"]
         e = 611.2 * np.exp(17.67 * (Td - 273.15)/ (Td - 29.65))
         # Compute sspecific humidity
         eps = 0.622

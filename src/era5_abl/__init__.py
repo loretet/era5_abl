@@ -30,7 +30,8 @@ from .filters import (
     filter_clouds,
     filter_stability, 
     filter_wind_dir,
-    print_filter_output
+    print_filter_output,
+    save_filtered_dataset
 )
 
 from .transfer_func import (
@@ -60,7 +61,8 @@ __all__ = [
     "retrieve_surface_data",
     "retrieve_model_level_data",
     "parallel_retrieval",
-    "print_filter_output"
+    "print_filter_output",
+    "save_filtered_dataset",
     ]
 
 __version__ = "0.1.0"

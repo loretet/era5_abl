@@ -1,7 +1,6 @@
 import numpy as np
 import xarray as xr
-from .operations import interpolate_to_height
-from .preprocessing import compute_thetav
+from .operations import interpolate_to_height, compute_thetav
 from .config import (
     GRAVITY
 )
@@ -78,23 +77,32 @@ def compute_grad_Ri(ds: xr.Dataset) -> xr.Dataset:
 
     return ds
 
-def compute_bulk_Ri(ds: xr.Dataset, reference_height: float = 20.0, velocity_offset: float = 0.0) -> xr.Dataset:
+def compute_bulk_Ri(
+        ds: xr.Dataset, ds_srf: xr.Dataset, 
+        reference_height: None | float = 20.0, velocity_offset: float = 0.0
+    ) -> xr.Dataset:
     """
-    Compute a bulk Richardson-number profile relative to a near-surface
-    reference height.
+    Compute a bulk Richardson-number profile relative to the surface (0m for winds, 2m for theta_v) or a specific height.
     """
 
     g = GRAVITY
-
-    # Get reference va,lues
-    theta_ref = interpolate_to_height(ds, "theta_v", None, reference_height)
-    u_ref = interpolate_to_height(ds, "u", None, reference_height)
-    v_ref = interpolate_to_height(ds, "v", None, reference_height)
     z = ds["z"]
 
+    if reference_height is not None:
+        # Get reference values if interpolating to a specific height (not the surface)
+        theta_v_ref = interpolate_to_height(ds, "theta_v", target_height=reference_height)
+        u_ref = interpolate_to_height(ds, "u", target_height=reference_height)
+        v_ref = interpolate_to_height(ds, "v", target_height=reference_height)
+        delta_z = z - reference_height 
+    else:
+        # Get values at the surface
+        theta_v_ref = ds_srf.theta_v_2m  # "surface" = 2m for virtual temperature
+        u_ref = xr.zeros_like(theta_v_ref)
+        v_ref = xr.zeros_like(theta_v_ref)
+        delta_z = z - 2.0
+
     # Get differences
-    delta_z = z - reference_height
-    delta_theta = ds["theta_v"] - theta_ref
+    delta_theta = ds["theta_v"] - theta_v_ref
     delta_u = ds["u"] - u_ref
     delta_v = ds["v"] - v_ref
 
@@ -108,16 +116,17 @@ def compute_bulk_Ri(ds: xr.Dataset, reference_height: float = 20.0, velocity_off
         g
         * delta_theta
         * delta_z
-        / (theta_ref * denominator)
+        / (theta_v_ref * denominator)
     )
     # Bulk Ri below/reference height is not used.
     Ri_bulk = Ri_bulk.where(delta_z > 0)
 
     # Assign to dataset
-    ds = ds.assign(Ri_b=Ri_bulk)
-    ds["Ri_b"].attrs.update({
+    var_name_in_ds = "Ri_b_srf" if reference_height is None else f"Ri_b_ref_{int(reference_height)}m"
+    ds = ds.assign({var_name_in_ds: Ri_bulk})
+    ds[var_name_in_ds].attrs.update({
         "long_name": "Bulk Richardson number",
-        "reference_height": reference_height,
+        "reference_height": reference_height if reference_height is not None else "surface (2m for temperature)",
         "velocity_offset": velocity_offset,
     })
 
@@ -135,7 +144,7 @@ def compute_difference_surface_top_ABL(ds_ml: xr.Dataset, ds_srf: xr.Dataset, va
     if var_name == "t":
         surf_var = ds_srf["t2m"] # no proper surface temperature available
     elif var_name == "theta_v":
-        surf_var = compute_thetav(ds_srf)
+        surf_var = compute_thetav(ds_srf)["theta_v_2m"]
     elif var_name == "wind_speed":
         surf_var = interpolate_to_height(ds_ml, var_name, None, 2.0)# wind speed at "surface" (2m)
     else:

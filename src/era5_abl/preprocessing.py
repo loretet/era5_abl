@@ -30,8 +30,8 @@ def compute_ecmwf_pressure_and_height(ds_ml: xr.Dataset, ds_srf: xr.Dataset) -> 
     # Identify vertical dimension name and extract model level numbers
     lev_dim = (
         "model_level"
-        if "model_level" in ds_ml.dims
-        else ("lev" if "lev" in ds_ml.dims else ("hybrid" if "hybrid" in ds_ml.dims else "level"))
+        if "model_level" in ds_ml.sizes
+        else ("lev" if "lev" in ds_ml.sizes else ("hybrid" if "hybrid" in ds_ml.sizes else "level"))
     )
     levels = ds_ml[lev_dim].values.astype(int)  # e.g., array([110, 111, ..., 137])
     n_levels = len(levels)
@@ -81,7 +81,7 @@ def compute_ecmwf_pressure_and_height(ds_ml: xr.Dataset, ds_srf: xr.Dataset) -> 
     z_agl_vals = phi_agl / g  # Height AGL [m]
 
     # Format as xarray DataArrays matching ds_ml dimensions
-    time_dim = "time" if "time" in ds_ml.dims else "valid_time"
+    time_dim = "time" if "time" in ds_ml.sizes else "valid_time"
 
     pressure_da = xr.DataArray(
         p_full,
@@ -161,16 +161,16 @@ def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None)
 
     # Standardize dimension names
     dim_map = {}
-    if "valid_time" in ds_ml.dims:
+    if "valid_time" in ds_ml.sizes:
         dim_map["valid_time"] = "time"
-    if "hybrid" in ds_ml.dims:
+    if "hybrid" in ds_ml.sizes:
         dim_map["hybrid"] = "model_level"
-    elif "lev" in ds_ml.dims:
+    elif "lev" in ds_ml.sizes:
         dim_map["lev"] = "model_level"
 
     if dim_map:
         ds_ml = ds_ml.rename(dim_map)
-        ds_srf = ds_srf.rename({k: v for k, v in dim_map.items() if k in ds_srf.dims})
+        ds_srf = ds_srf.rename({k: v for k, v in dim_map.items() if k in ds_srf.sizes})
 
     # Strip residual scalar lat/lon dimensions
     ds_ml = ds_ml.squeeze(drop=True)
