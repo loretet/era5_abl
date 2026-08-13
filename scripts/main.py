@@ -26,9 +26,9 @@ DATA_DIR = Path(
 SRF_DATA_RETRIEVAL = False
 ML_DATA_RETRIEVAL = False
 # Whether to filter the datasets or not:
-FILTER_DATASETS = False
+FILTER_DATASETS = True
 # Dates considered:
-DATES = "2020-01-01/2021-12-31"
+DATES = "2020-01-01/to/2020-12-31"
 # Critical Richardson:
 RI_C = 0.25
 # Reference height for some transfer functions/stability computations:
@@ -172,7 +172,10 @@ _,ax=plot_abl_top_vs_surface_scatter_contour(ds_ml_dict, ds_srf_dict, temp_var="
 ax.axhline(0.0,c="k",alpha=0.8)
 
 # Example 4: Hexbin plot showing the toa-surface difference for every location separately
-_,ax = plot_abl_top_vs_surface_hexbin(ds_ml_dict, ds_srf_dict, temp_var="theta_v", gridsize=40)
+_,axs = plot_abl_top_vs_surface_hexbin(ds_ml_dict, ds_srf_dict, temp_var="theta_v", gridsize=40)
+for ax in axs:
+    ax.set_xlim(left=0, right=30)
+    ax.set_ylim(top=6.1, bottom=-6)
 
 # Example 5: Stability correction function curves
 _,ax = plot_Ri_vs_stability_function(ds_ml_dict, target_var="fm_20", reference_height=REFERENCE_HEIGHT)
