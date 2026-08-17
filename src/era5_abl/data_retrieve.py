@@ -58,7 +58,7 @@ def retrieve_model_level_data(
     client.retrieve(
         "reanalysis-era5-complete",
         {
-            "date": dates,
+            "date": dates.replace("/", "/to/") if "/to/" not in dates else dates,
             "levelist": mls,
             "levtype": "ml",
             "param": params,
@@ -74,7 +74,8 @@ def retrieve_model_level_data(
 
 def parallel_retrieval(    
     dates: str,
-    output_dir: str | Path,
+    site_names: list[str] | None = None,
+    output_dir: str | Path = ".",
     max_workers: int = 4,
     surface_variables: list[str] = ERA5_SURFACE_VARIABLES,
     ml_params: str = ERA5_MODEL_LEVEL_PARAMS,
@@ -88,11 +89,14 @@ def parallel_retrieval(
     """
     Retrieves ERA5 data in parallel for each distinct site. However, within each site,
     the surface and model level data are requested sequentially.
+    It either iterates htorugh all the locations in CONFIG, or only through those
+    listed in "site_names". However, they still have to be present in CONFIG.
     The function still awaits for the end of the download (via "future.result()") before
     proceeding, to avoid working on files that do not exist yet.
     """
 
     output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     def retrieve_site(name, site, retrieve_srf_data, retrieve_ml_data):
 
@@ -132,16 +136,29 @@ def parallel_retrieval(
         print("and 24h per year for model level data (five variables over one 0.25x0.25 deg area).")
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [
-                executor.submit(
+
+            futures = []
+
+            if site_names is None:
+                # Retrieve all configured sites
+                selected_sites = SITE_CONFIGS.items()
+            else:
+                # Retrieve only selected sites
+                selected_sites = (
+                    (name, SITE_CONFIGS[name])
+                    for name in site_names
+                )
+
+            for name, site in selected_sites:
+                future = executor.submit(
                     retrieve_site,
                     name,
                     site,
                     retrieve_srf_data,
-                    retrieve_ml_data
+                    retrieve_ml_data,
                 )
-                for name, site in SITE_CONFIGS.items()
-            ]
+                futures.append(future)
 
+            # Wait until all retrievals finish
             for future in futures:
                 future.result()

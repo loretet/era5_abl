@@ -23,12 +23,12 @@ DATA_DIR = Path(
     "Entrainment_with_Palli/ERA5_data"
 )
 # Whether to retrieve data with CDS API or not:
-SRF_DATA_RETRIEVAL = True
-ML_DATA_RETRIEVAL = True
+SRF_DATA_RETRIEVAL = False
+ML_DATA_RETRIEVAL = False
 # Whether to filter the datasets or not:
 FILTER_DATASETS = True
-# Dates considered:
-DATES = "2020-01-01/to/2021-12-31"
+# Date interval considered:
+DATES = "2020-01-01/2021-12-31"
 # Number of levels with Ri higher than 0.25 to compute BLH
 RIb_PERSISTENCE = 5
 # Set filtering parameters (to filter for neutral and stable cloud-free layers, in this example)
@@ -45,10 +45,22 @@ filter_params = {
     "wind_dir_max_deg": 360,    # Wind direction filtering, higher value in deg (placeholder! Updated later)
 }
 filtered_dir = DATA_DIR / "filtered_data"
+# Optionally, only select some locations from the SITE_CONFIGS dictionary:
+# (Side note: every new location has to be added to SITE_CONFIGS in era5_abl/src/config.py)
+SELECTED_LOCATIONS = [
+    "Cabauw",
+    "Mace Head",
+    "ARM Southern Great PLains",
+    "Summit Station",
+    "Concordia Dome C",
+    "ARM Eastern North Atlantic",
+]
+site_configs = {key : SITE_CONFIGS[key] for key in SELECTED_LOCATIONS}
 
 
 #%% Retrieve ERA5 data
 era.parallel_retrieval(
+    site_names=SELECTED_LOCATIONS,
     dates=DATES,
     output_dir=DATA_DIR,
     max_workers=4,
@@ -62,7 +74,7 @@ ds_srf_dict = {}
 
 # Process each dataset
 if FILTER_DATASETS:
-    for loc, site in SITE_CONFIGS.items():
+    for loc, site in site_configs.items():
         print(f"\n--- Processing Location: {loc} ---")
         ml_path = DATA_DIR / site.model_level_filename
         srf_path = DATA_DIR / site.surface_filename
@@ -146,7 +158,7 @@ if FILTER_DATASETS:
             filter_params=filter_params,
         )
 else:
-    for loc, site in SITE_CONFIGS.items():
+    for loc, site in site_configs.items():
         # Open already-stored datasets for multi-site comparisons
         ds_ml_dict[loc] = xr.open_dataset(filtered_dir / f"{loc.replace(" ","")}_lvls_filtered.nc")
         ds_srf_dict[loc] = xr.open_dataset(filtered_dir / f"{loc.replace(" ","")}_srf_filtered.nc")
