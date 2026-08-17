@@ -12,12 +12,16 @@ from .config import SITE_CONFIGS
 
 
 DATASET_STYLES = [
-    {"color": "#1f77b4", "linestyle": "-", "marker": "o"},   
+    {"color": "#1f77b4", "linestyle": "-",  "marker": "o"},   
     {"color": "#ff7f0e", "linestyle": "--", "marker": "s"},  
     {"color": "#2ca02c", "linestyle": "-.", "marker": "^"}, 
-    {"color": "#d62728", "linestyle": ":", "marker": "D"},   
+    {"color": "#d62728", "linestyle": ":",  "marker": "D"},
+    {"color": "#9467bd", "linestyle": "-",  "marker": "v"},
+    {"color": "#8c564b", "linestyle": "--", "marker": "P"},
+    {"color": "#e377c2", "linestyle": "-.", "marker": "X"},
+    {"color": "#7f7f7f", "linestyle": ":",  "marker": "*"},
+    {"color": "#17becf", "linestyle": "-",  "marker": "h"},
 ]
-
 
 def approx_scientific_notation(value: float) -> str:
     """Format a float in approximate scientific notation. E.g. 0.00234 => 2e-3."""
