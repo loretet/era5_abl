@@ -23,16 +23,12 @@ DATA_DIR = Path(
     "Entrainment_with_Palli/ERA5_data"
 )
 # Whether to retrieve data with CDS API or not:
-SRF_DATA_RETRIEVAL = False
-ML_DATA_RETRIEVAL = False
+SRF_DATA_RETRIEVAL = True
+ML_DATA_RETRIEVAL = True
 # Whether to filter the datasets or not:
 FILTER_DATASETS = True
 # Dates considered:
-DATES = "2020-01-01/to/2020-12-31"
-# Critical Richardson:
-RI_C = 0.25
-# Reference height for some transfer functions/stability computations:
-REFERENCE_HEIGHT = 20.0
+DATES = "2020-01-01/to/2021-12-31"
 # Number of levels with Ri higher than 0.25 to compute BLH
 RIb_PERSISTENCE = 5
 # Set filtering parameters (to filter for neutral and stable cloud-free layers, in this example)
@@ -40,11 +36,11 @@ filter_params = {
     "lcc_threshold": 0.15,                # Maximum amount of Low Level Clouds allowed by the cloud filtering
     "cloud_window_hours": 2,              # Amount of hours where the lcc_threshold must be maintained in cloud filtering
     "ri_surf_min": -2e-4,                 # Minimum/maximum Richardson number at height ri_surf_min_height retained by the stability filtering
-    "ri_surf_min_height": REFERENCE_HEIGHT,       # Height at which the minimum/maximum surface Richardson number is computed for stability filtering
+    "ri_surf_min_height": 20.0,       # Height at which the minimum/maximum surface Richardson number is computed for stability filtering
     "grad_tol": -2e-4,                            # Minimum/maximum Richardson number retained by the stability filtering
     "min_valid_grad_fraction": 0.8,      # Minimum fraction of d(theta_v)/dz that must be above grad_tol
     "grad_smooth_window": 3,             # Gradient smoothing windows for stability filtering 
-    "Ri_c": RI_C,               # Critical Richardson number for stability filtering and computation
+    "Ri_c": 0.25,               # Critical Richardson number for stability filtering and computation
     "wind_dir_min_deg": 0,      # Wind direction filtering,  lower value in deg  (placeholder! Updated later)
     "wind_dir_max_deg": 360,    # Wind direction filtering, higher value in deg (placeholder! Updated later)
 }
@@ -108,12 +104,12 @@ if FILTER_DATASETS:
         era.print_filter_output(ds_ml_f0, ds_ml_f3, "Total filtering results from the initial dataset")
 
         # Stability functions computation
-        eps, eps_t = era.compute_epsilon(location=loc, reference_height=REFERENCE_HEIGHT)
+        eps, eps_t = era.compute_epsilon(location=loc, reference_height=filter_params["ri_surf_min_height"])
         ds_ml_filtered = era.compute_zeta_GL18(
             ds_ml_filtered,
             epsilon=eps,
             epsilon_t=eps_t,
-            reference_height=REFERENCE_HEIGHT
+            reference_height=filter_params["ri_surf_min_height"]
         )
         fm_20 = era.compute_fm(
             ds_ml_filtered,
@@ -178,10 +174,10 @@ for ax in axs:
     ax.set_ylim(top=6.1, bottom=-6)
 
 # Example 5: Stability correction function curves
-_,ax = plot_Ri_vs_stability_function(ds_ml_dict, target_var="fm_20", reference_height=REFERENCE_HEIGHT)
+_,ax = plot_Ri_vs_stability_function(ds_ml_dict, target_var="fm_20", reference_height=filter_params["ri_surf_min_height"])
 ax.set_ylim(top=1.0,bottom=0.0)
 ax.set_xlim(left=0.0,right=0.5)
-_,ax = plot_Ri_vs_stability_function(ds_ml_dict, target_var="fh_20", reference_height=REFERENCE_HEIGHT)
+_,ax = plot_Ri_vs_stability_function(ds_ml_dict, target_var="fh_20", reference_height=filter_params["ri_surf_min_height"])
 ax.set_ylim(top=1.0,bottom=0.0)
 ax.set_xlim(left=0.0,right=0.5)  
 
