@@ -24,7 +24,7 @@ DATA_DIR = Path(
 )
 # Whether to retrieve data with CDS API or not:
 SRF_DATA_RETRIEVAL = False
-ML_DATA_RETRIEVAL = False
+ML_DATA_RETRIEVAL = True
 # Whether to filter the datasets or not:
 FILTER_DATASETS = True
 # Date interval considered:
@@ -50,7 +50,7 @@ filtered_dir = DATA_DIR / "filtered_data"
 SELECTED_LOCATIONS = [
     "Cabauw",
     "Mace Head",
-    "ARM Southern Great PLains",
+    "ARM Southern Great Plains",
     "Summit Station",
     "Concordia Dome C",
     "ARM Eastern North Atlantic",
