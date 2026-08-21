@@ -48,7 +48,7 @@ SITE_CONFIGS = {
         model_level_filename="SummitStation_lvls.grib",
         surface_filename="SummitStation_surface.grib",
     ),
-    "ARM Great Plains": SiteConfig(
+    "ARM Southern Great Plains": SiteConfig(
         area="36.75/97.25/36.5/97.5",
         wind_sector=(0.0, 360.0),
         roughness_length_momentum=0.15, # quite variable due to crops
