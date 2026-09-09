@@ -23,7 +23,7 @@ DATA_DIR = Path(
     "Entrainment_with_Palli/ERA5_data"
 )
 # Whether to retrieve data with CDS API or not:
-SRF_DATA_RETRIEVAL = False
+SRF_DATA_RETRIEVAL = True
 ML_DATA_RETRIEVAL = True
 # Whether to filter the datasets or not:
 FILTER_DATASETS = True
@@ -63,7 +63,7 @@ era.parallel_retrieval(
     site_names=SELECTED_LOCATIONS,
     dates=DATES,
     output_dir=DATA_DIR,
-    max_workers=4,
+    max_workers=len(SELECTED_LOCATIONS),
     retrieve_srf_data=SRF_DATA_RETRIEVAL,
     retrieve_ml_data=ML_DATA_RETRIEVAL,
 )
