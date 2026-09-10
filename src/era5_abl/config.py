@@ -57,7 +57,7 @@ SITE_CONFIGS = {
         surface_filename="ARMGreatPlains_surface.grib",    
     ),
     "Concordia Dome C": SiteConfig(
-        area="75.25/123.0/75.0/123.25",
+        area="-75.25/123.0/-75.0/123.25",
         wind_sector=(0.0, 360.0),
         roughness_length_momentum=1e-3, # GABLS4 choices. Quite dependent on wind direction in reality. Actual measurements show disagreement (see below):
         roughness_length_heat=1e-4,     # Vignon, É., Genthon, C., Barral, H., Amory, C., Picard, G., Gallee, H., Casasanta, G., & Argentini, S. (2017). Momentum- and Heat-Flux Parametrization at Dome C, Antarctica: A Sensitivity Study. Boundary-Layer Meteorology, 162, 341-367. https://doi.org/10.1007/s10546-016-0192-3
