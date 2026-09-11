@@ -220,7 +220,7 @@ def plot_multi_dataset_pdf(
 
 
 def plot_Ri_vs_stability_function(
-    ds_dict: dict[str, xr.Dataset], target_var: str = "fm",
+    ds_dict: dict[str, xr.Dataset], target_var: str = "fm", ref_IFS_profile: str = None,
     reference_height: float = 20.0, style: list[dict[str,str]] = DATASET_STYLES
 ):
     """
@@ -258,6 +258,18 @@ def plot_Ri_vs_stability_function(
             linestyle=ds_style["linestyle"],
             linewidth=2,
             label=label_text,
+        )
+    if ref_IFS_profile is not None:
+        f_IFS_val = ds[ref_IFS_profile].values.flatten()
+        valid_mask = valid_mask & np.isfinite(f_IFS_val)
+        f_IFS_plot = f_IFS_val[valid_mask]
+
+        ax.plot(
+            ri_plot[sort_idx],
+            f_IFS_plot[sort_idx],
+            color="k",
+            linewidth=1,
+            label="IFS reference (LTG)",
         )
 
     y_label_str = fr"$f_m(z/L)_{{{int(reference_height)}}}$" if "fm" in target_var else fr"$f_h(z/L)_{{{int(reference_height)}}}$"
