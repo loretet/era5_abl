@@ -155,5 +155,5 @@ def save_filtered_dataset(
     output_path = output_dir / filename
     ds_out.to_netcdf(output_path)
 
-    print(f"Saved filtered dataset: {output_path}")
+    print(f"Saved processed dataset: {output_path}")
     return output_path
