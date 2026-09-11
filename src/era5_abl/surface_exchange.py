@@ -3,15 +3,15 @@ import xarray as xr
 from .config import get_site_config
 from .operations import interpolate_to_height
 
-def compute_epsilon(location: str, reference_height: float = 20.0,) -> tuple[float, float]:
+
+
+def compute_epsilon(ds_srf: xr.Dataset, reference_height: float = 20.0,) -> tuple[float, float]:
     """ 
     Computes ration between z (at ref. height) and z0 or zt from surface data.
     """
 
-    site = get_site_config(location)
-
-    epsilon = reference_height / site.roughness_length_momentum
-    epsilon_t = reference_height / site.roughness_length_heat
+    epsilon = reference_height / ds.roughness_length_momentum
+    epsilon_t = reference_height / ds.roughness_length_heat
 
     return epsilon, epsilon_t
 

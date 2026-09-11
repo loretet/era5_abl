@@ -34,7 +34,7 @@ from .filters import (
     save_filtered_dataset,
 )
 
-from .transfer_func import (
+from .surface_exchange import (
     compute_epsilon,
     compute_zeta_GL18,
     compute_fm_GL18,
