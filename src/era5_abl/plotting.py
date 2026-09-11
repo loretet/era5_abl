@@ -220,7 +220,7 @@ def plot_multi_dataset_pdf(
 
 
 def plot_Ri_vs_stability_function(
-    ds_dict: dict[str, xr.Dataset], target_var: str = "fm", ref_IFS_profile: str = None,
+    ds_ml_dict: dict[str, xr.Dataset], ds_srf_dict: dict[str, xr.Dataset], target_var: str = "fm", ref_IFS_profile: str = None,
     reference_height: float = 20.0, style: list[dict[str,str]] = DATASET_STYLES
 ):
     """
@@ -229,7 +229,7 @@ def plot_Ri_vs_stability_function(
     """
     fig, ax = plt.subplots(figsize=(8, 6))
 
-    for idx, (name, ds) in enumerate(ds_dict.items()):
+    for idx, (name, ds) in enumerate(ds_ml_dict.items()):
         ds_style = style[idx % len(style)]
 
         # Extract Ri at reference_height and stability function arrays
@@ -245,12 +245,14 @@ def plot_Ri_vs_stability_function(
         sort_idx = np.argsort(ri_plot)
 
         # Write down labels for legend
+        z0 = ds_srf_dict[name].z0.mean(dims="time")
+        z0h = ds_srf_dict[name].z0h.mean(dims="time")
         if "fm" in target_var:
-            label_text = fr"{name}, $\epsilon = {approx_scientific_notation(reference_height/SITE_CONFIGS[name].roughness_length_momentum)}$ " + \
-                                 fr"$\alpha = {approx_scientific_notation(SITE_CONFIGS[name].roughness_length_momentum/SITE_CONFIGS[name].roughness_length_heat)}$" 
+            label_text = fr"{name}, $\epsilon = {approx_scientific_notation(reference_height/z0)}$ " + \
+                                 fr"$\alpha = {approx_scientific_notation(z0/z0h)}$" 
         else:
-            label_text = fr"{name}, $\epsilon_t = {approx_scientific_notation(reference_height/SITE_CONFIGS[name].roughness_length_heat)}$ " + \
-                                 fr"$\alpha = {approx_scientific_notation(SITE_CONFIGS[name].roughness_length_momentum/SITE_CONFIGS[name].roughness_length_heat)}$" 
+            label_text = fr"{name}, $\epsilon_t = {approx_scientific_notation(reference_height/z0h)}$ " + \
+                                 fr"$\alpha = {approx_scientific_notation(z0/z0h)}$" 
         ax.plot(
             ri_plot[sort_idx],
             f_plot[sort_idx],

@@ -117,6 +117,8 @@ def standardize_surface_varnames(ds: xr.Dataset) -> xr.Dataset:
         "var159": {"short_name": "blh", "long_name": "Boundary layer height"},
         "var129": {"short_name": "z", "long_name": "Surface geopotential"},
         "var168": {"short_name": "2d", "long_name": "2 metre dewpoint temperature"},
+        "var244": {"short_name": "fsr", "long_name": "Forecast roughness length for momentum"},
+        "var245": {"short_name": "flsr", "long_name": "Log of forecast roughness length for heat"},
     }
 
     # Update long_name attributes for present variables prior to renaming
@@ -191,6 +193,14 @@ def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None,
 
     # Compute wind speed 
     ds_ml["wind_speed"] = np.sqrt(ds_ml["u"]**2 + ds_ml["v"]**2)
+
+    # Roughness lengths are stored as log-values for heat; convert back to physical units.
+    ds_srf = ds_srf.rename({"fsr": "z0"})
+    ds_srf["z0"].attrs.update({"long_name": "Roughness length for momentum", "units": "m"})
+    ds_srf["z0h"] = np.exp(ds_srf["flsr"])
+    ds_srf["z0h"].attrs.update({"long_name": "Roughness length for heat", "units": "m"})
+    ds_srf = ds_srf.drop_vars(["flsr"])
+
 
     # Reindex vertical axis so k=0 is Surface and k=N-1 is Top of Atmosphere
     ds_ml = ds_ml.reindex(model_level=ds_ml.model_level[::-1])
