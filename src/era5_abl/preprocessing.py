@@ -34,7 +34,6 @@ def compute_ecmwf_pressure_and_height(ds_ml: xr.Dataset, ds_srf: xr.Dataset) -> 
         else ("lev" if "lev" in ds_ml.sizes else ("hybrid" if "hybrid" in ds_ml.sizes else "level"))
     )
     levels = ds_ml[lev_dim].values.astype(int)  # e.g., array([110, 111, ..., 137])
-    n_levels = len(levels)
 
     # Extract A and B hybrid coefficients
     if "hyai" in ds_ml and "hybi" in ds_ml:
@@ -134,7 +133,7 @@ def standardize_surface_varnames(ds: xr.Dataset) -> xr.Dataset:
 
     return ds.rename(rename_dict)
 
-def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None) -> tuple[xr.Dataset, xr.Dataset]:
+def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None, CDO_process: bool = True) -> tuple[xr.Dataset, xr.Dataset]:
     """
     Spatially averages GRIB files via CDO (-f nc4), explicitly computes
     3D pressure p(t, k) and hydrostatic height z_agl(t, k) from hybrid coefficients,
@@ -150,7 +149,7 @@ def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None)
         (grib_ml_path, ml_nc_path),
         (grib_srf_path, srf_nc_path),
     ]:
-        if not os.path.exists(nc_path) or os.path.getsize(nc_path) == 0:
+        if CDO_process or not os.path.exists(nc_path) or os.path.getsize(nc_path) == 0:
             cmd = f'cdo -f nc4 fldmean "{grib_path}" "{nc_path}"'
             print(f"Executing: {cmd}")
             subprocess.run(cmd, shell=True, check=True)
