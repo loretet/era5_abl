@@ -31,14 +31,16 @@ from .filters import (
     filter_stability, 
     filter_wind_dir,
     print_filter_output,
-    save_filtered_dataset
+    save_filtered_dataset,
 )
 
 from .transfer_func import (
     compute_epsilon,
     compute_zeta_GL18,
-    compute_fm,
-    compute_fh,
+    compute_fm_GL18,
+    compute_fm_IFS,
+    compute_fh_GL18,
+    compute_fh_IFS,
 )
 
 __all__ = [
@@ -56,8 +58,10 @@ __all__ = [
     "compute_difference_surface_top_ABL",
     "compute_epsilon",
     "compute_zeta_GL18",
-    "compute_fm",
-    "compute_fh",
+    "compute_fm_GL18",
+    "compute_fh_GL18",
+    "compute_fm_IFS",
+    "compute_fh_IFS",
     "retrieve_surface_data",
     "retrieve_model_level_data",
     "parallel_retrieval",
