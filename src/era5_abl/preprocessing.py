@@ -143,8 +143,8 @@ def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None,
     """
 
     # Output paths
-    ml_nc_path = grib_ml_path.replace(".grib", "_CDO_processed.nc")
-    srf_nc_path = grib_srf_path.replace(".grib", "_CDO_processed.nc")
+    ml_nc_path = grib_ml_path.replace(".grib", "_CDO_processed_tmp.nc")
+    srf_nc_path = grib_srf_path.replace(".grib", "_CDO_processed_tmp.nc")
 
     # Run CDO fldmean with explicit -f nc4 flag
     for grib_path, nc_path in [
@@ -210,4 +210,7 @@ def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None,
         ds_ml.attrs["Location"] = location
         ds_srf.attrs["Location"] = location
 
+    # Remove the temporary CO processed files (in the main the user can decide whether to save them or not)
+    os.remove(srf_nc_path)
+    os.remove(ml_nc_path)
     return ds_ml, ds_srf
