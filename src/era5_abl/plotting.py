@@ -245,8 +245,8 @@ def plot_Ri_vs_stability_function(
         sort_idx = np.argsort(ri_plot)
 
         # Write down labels for legend
-        z0 = ds_srf_dict[name].z0.mean(dims="time")
-        z0h = ds_srf_dict[name].z0h.mean(dims="time")
+        z0 = ds_srf_dict[name].z0.mean(dim="time")
+        z0h = ds_srf_dict[name].z0h.mean(dim="time")
         if "fm" in target_var:
             label_text = fr"{name}, $\epsilon = {approx_scientific_notation(reference_height/z0)}$ " + \
                                  fr"$\alpha = {approx_scientific_notation(z0/z0h)}$" 
