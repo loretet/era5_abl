@@ -8,8 +8,8 @@ def compute_epsilon(ds_srf: xr.Dataset, reference_height: float = 20.0,) -> tupl
     Computes ration between z (at ref. height) and z0 or zt from surface data.
     """
 
-    epsilon = reference_height / ds_srf.z0.mean(dims="time")
-    epsilon_t = reference_height / ds_srf.z0h.mean(dims="time")
+    epsilon = reference_height / ds_srf.z0.mean(dim="time")
+    epsilon_t = reference_height / ds_srf.z0h.mean(dim="time")
 
     return epsilon, epsilon_t
 
