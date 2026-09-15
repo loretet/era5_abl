@@ -20,13 +20,19 @@ import xarray as xr
 # Directory with data:
 DATA_DIR = Path(
     "/Users/lodo0477/Documents/PhD/Research/"
-    "Entrainment_with_Palli/ERA5_data"
+    "Entrainment_with_Palli/ERA5_data/"
 )
 # Whether to retrieve data with CDS API or not:
-SRF_DATA_RETRIEVAL = True
-ML_DATA_RETRIEVAL = True
-# Whether to filter the datasets or not:
-FILTER_DATASETS = True
+SRF_DATA_RETRIEVAL = False
+ML_DATA_RETRIEVAL = False
+# Wether to process the data (filter, add multiple variables...)
+PROCESS_DATASETS = True
+# Whether to carry out the CDO processing (fldmean):
+CDO_PROCESSING = True
+# Save CDO-processed datasets. 
+SAVE_CDO = True
+# Whether to save the filtered datasets or not:
+SAVE_FILTERED_DATASETS = True
 # Date interval considered:
 DATES = "2020-01-01/2021-12-31"
 # Number of levels with Ri higher than 0.25 to compute BLH
@@ -41,19 +47,19 @@ filter_params = {
     "min_valid_grad_fraction": 0.8,      # Minimum fraction of d(theta_v)/dz that must be above grad_tol
     "grad_smooth_window": 3,             # Gradient smoothing windows for stability filtering 
     "Ri_c": 0.25,               # Critical Richardson number for stability filtering and computation
-    "wind_dir_min_deg": 0,      # Wind direction filtering,  lower value in deg  (placeholder! Updated later)
-    "wind_dir_max_deg": 360,    # Wind direction filtering, higher value in deg (placeholder! Updated later)
+    "wind_dir_min_deg": 0,      # Wind direction filtering,  lower value in deg  (placeholder! Updated later where needed)
+    "wind_dir_max_deg": 360,    # Wind direction filtering, higher value in deg (placeholder! Updated later where needed)
 }
 filtered_dir = DATA_DIR / "filtered_data"
 # Optionally, only select some locations from the SITE_CONFIGS dictionary:
-# (Side note: every new location has to be added to SITE_CONFIGS in era5_abl/src/config.py)
+# (Side note: every new location has to be added to SITE_CONFIGS in era5_abl/src/config.py !)
 SELECTED_LOCATIONS = [
     "Cabauw",
     "Mace Head",
     "ARM Southern Great Plains",
     "Summit Station",
     "Concordia Dome C",
-    "ARM Eastern North Atlantic",
+    # "ARM Eastern North Atlantic",
 ]
 site_configs = {key : SITE_CONFIGS[key] for key in SELECTED_LOCATIONS}
 
@@ -63,7 +69,7 @@ era.parallel_retrieval(
     site_names=SELECTED_LOCATIONS,
     dates=DATES,
     output_dir=DATA_DIR,
-    max_workers=len(SELECTED_LOCATIONS),
+    max_workers=len(SELECTED_LOCATIONS)*2,
     retrieve_srf_data=SRF_DATA_RETRIEVAL,
     retrieve_ml_data=ML_DATA_RETRIEVAL,
 )
@@ -73,14 +79,19 @@ ds_ml_dict = {}
 ds_srf_dict = {}
 
 # Process each dataset
-if FILTER_DATASETS:
+if PROCESS_DATASETS:
     for loc, site in site_configs.items():
         print(f"\n--- Processing Location: {loc} ---")
-        ml_path = DATA_DIR / site.model_level_filename
-        srf_path = DATA_DIR / site.surface_filename
+        srf_path = DATA_DIR / "raw_surface_data" / site.surface_filename
+        ml_path = DATA_DIR / "raw_lvls_data" / site.model_level_filename
 
         # File prep and spatial averaging
-        ds_ml, ds_srf = era.prepare_dataset(str(ml_path), str(srf_path), location=loc)
+        ds_ml, ds_srf = era.prepare_dataset(str(ml_path), str(srf_path), location=loc, CDO_process=CDO_PROCESSING)
+
+        # Save unfiltered CDO-processed datasets
+        if SAVE_CDO:
+            ds_srf.to_netcdf(f"{DATA_DIR}/{site.surface_filename.replace(".grib", "_CDO_processed.nc")}")
+            ds_ml.to_netcdf(f"{DATA_DIR}/{site.model_level_filename.replace(".grib", "_CDO_processed.nc")}")
 
         # Cloud filtering
         ds_ml_f0, ds_srf_f0 = ds_ml.copy(), ds_srf.copy()
@@ -115,48 +126,40 @@ if FILTER_DATASETS:
         ds_srf_filtered = ds_srf_f3
         era.print_filter_output(ds_ml_f0, ds_ml_f3, "Total filtering results from the initial dataset")
 
-        # Stability functions computation
-        eps, eps_t = era.compute_epsilon(location=loc, reference_height=filter_params["ri_surf_min_height"])
-        ds_ml_filtered = era.compute_zeta_GL18(
-            ds_ml_filtered,
-            epsilon=eps,
-            epsilon_t=eps_t,
-            reference_height=filter_params["ri_surf_min_height"]
-        )
-        fm_20 = era.compute_fm(
-            ds_ml_filtered,
-            epsilon=eps,
-        )
-        fh_20 = era.compute_fh(
-            fm_20,
-            ds_ml_filtered,
-            epsilon_t=eps_t,
-        )
-        ds_ml_filtered = ds_ml_filtered.assign(
-            fm_20=fm_20,
-            fh_20=fh_20,
-        )
+        # Stability functions computation - GL18
+        eps, eps_t = era.compute_epsilon(ds_srf_filtered, reference_height=filter_params["ri_surf_min_height"])
+        ds_ml_filtered = era.compute_zeta_GL18(ds_ml_filtered, epsilon=eps, epsilon_t=eps_t, 
+                                               reference_height=filter_params["ri_surf_min_height"])
+        fm_20_GL18 = era.compute_fm_GL18(ds_ml_filtered, epsilon=eps)
+        fh_20_GL18 = era.compute_fh_GL18(fm_20_GL18, ds_ml_filtered, epsilon_t=eps_t)
+        ds_ml_filtered = ds_ml_filtered.assign(fm_20_GL18=fm_20_GL18, fh_20_GL18=fh_20_GL18)
+
+        # Stability functions computation - IFS
+        fm_20_IFS = era.compute_fm_IFS(ds_ml_filtered, reference_height=filter_params["ri_surf_min_height"])
+        fh_20_IFS = era.compute_fh_IFS(ds_ml_filtered, reference_height=filter_params["ri_surf_min_height"])
+        ds_ml_filtered = ds_ml_filtered.assign(fm_20_IFS=fm_20_IFS, fh_20_IFS=fh_20_IFS)
 
         # Store for multi-site comparisons
         ds_ml_dict[loc] = ds_ml_filtered
         ds_srf_dict[loc] = ds_srf_filtered
 
-        # Save datasets
-        filter_params.update(wind_dir_min_deg=dir_min, wind_dir_max_deg=dir_max)
-        era.save_filtered_dataset(
-            ds_ml_filtered,
-            location=loc,
-            dataset_type="lvls",
-            output_dir=filtered_dir,
-            filter_params=filter_params,
-        )
-        era.save_filtered_dataset(
-            ds_srf_filtered,
-            location=loc,
-            dataset_type="srf",
-            output_dir=filtered_dir,
-            filter_params=filter_params,
-        )
+        # Save filtered datasets
+        if SAVE_FILTERED_DATASETS:
+            filter_params.update(wind_dir_min_deg=dir_min, wind_dir_max_deg=dir_max)
+            era.save_filtered_dataset(
+                ds_ml_filtered,
+                location=loc,
+                dataset_type="lvls",
+                output_dir=filtered_dir,
+                filter_params=filter_params,
+            )
+            era.save_filtered_dataset(
+                ds_srf_filtered,
+                location=loc,
+                dataset_type="srf",
+                output_dir=filtered_dir,
+                filter_params=filter_params,
+            )
 else:
     for loc, site in site_configs.items():
         # Open already-stored datasets for multi-site comparisons
@@ -176,30 +179,31 @@ ax.set_xlim(left=0,right=0.5)
 # ax.set_ylim(top=5,bottom=0.0)
 
 # Example 3: Scatter/KDE of Delta T vs Wind speed at BLH
-_,ax=plot_abl_top_vs_surface_scatter_contour(ds_ml_dict, ds_srf_dict, temp_var="theta_v")
+_,ax=plot_abl_top_vs_surface_scatter_contour(ds_ml_dict, ds_srf_dict, temp_var="t")
 ax.axhline(0.0,c="k",alpha=0.8)
 
 # Example 4: Hexbin plot showing the toa-surface difference for every location separately
-_,axs = plot_abl_top_vs_surface_hexbin(ds_ml_dict, ds_srf_dict, temp_var="theta_v", gridsize=40)
+_,axs = plot_abl_top_vs_surface_hexbin(ds_ml_dict, ds_srf_dict, temp_var="t", gridsize=40)
 for ax in axs:
     ax.set_xlim(left=0, right=30)
     ax.set_ylim(top=6.1, bottom=-6)
 
 # Example 5: Stability correction function curves
-_,ax = plot_Ri_vs_stability_function(ds_ml_dict, target_var="fm_20", reference_height=filter_params["ri_surf_min_height"])
-ax.set_ylim(top=1.0,bottom=0.0)
-ax.set_xlim(left=0.0,right=0.5)
-_,ax = plot_Ri_vs_stability_function(ds_ml_dict, target_var="fh_20", reference_height=filter_params["ri_surf_min_height"])
-ax.set_ylim(top=1.0,bottom=0.0)
-ax.set_xlim(left=0.0,right=0.5)  
+for f in ["fm","fh"]:
+    _,ax = plot_Ri_vs_stability_function(ds_ml_dict, ds_srf_dict, target_var=f"{f}_20_GL18", 
+                                        ref_IFS_profile=f"{f}_20_IFS", reference_height=filter_params["ri_surf_min_height"])
+    ax.set_ylim(top=1.0,bottom=0.0)
+    ax.set_xlim(left=0.0,right=0.5)
 
 # Example 6: Single timestamp vertical profile
-plot_vertical_profile(ds_ml_dict, "theta_v", time="2020-07-15T12:00:00")
+plot_vertical_profile(ds_ml_dict, "t", time="2020-07-15T12:00:00")
 
-# Example 7: Time-Range variable profile sequence 
+# Example 7: Plot surface variable in time
+
+# Example 8: Time-Range variable profile sequence 
 # Create one-entry dict to oplot only one location (can also be used with the entire dictionary, but might be confusing)
 target_loc = "Mace Head"  
 dict_from_loc = {target_loc: ds_ml_dict[target_loc]} 
-plot_vertical_profile(dict_from_loc, "theta_v", time_range=("2020-07-15T06:00:00", "2020-07-25T12:00:00"))
+plot_vertical_profile(dict_from_loc, "t", time_range=("2020-07-15T06:00:00", "2020-07-25T12:00:00"))
 
 #%%
