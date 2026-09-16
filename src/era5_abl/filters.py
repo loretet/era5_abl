@@ -98,6 +98,18 @@ def filter_wind_dir(ds: xr.Dataset, ds_srf: xr.Dataset, dir_min: float, dir_max:
 
     return ds_ml_filtered, ds_srf_filtered
 
+def filter_ds_below_BLH(ds: xr.Dataset, ds_srf: xr.Dataset) -> xr.Dataset:
+    """
+    Filters dataset so that values above the ERA5-computed BLH are NaNs 
+    """
+    # Mask levels below BLH
+    sub_blh_mask = (ds["z"] <= ds_srf["blh"].sel(time=ds.time))
+
+    # Levels above BLH become NaN
+    ds_ml_filtered = ds.where(sub_blh_mask)
+
+    return ds_ml_filtered
+
 def print_filter_output(ds_initial: xr.Dataset, ds_filtered: xr.Dataset, step_name: str) -> dict:
     """
     Calculates and outputs the absolute number and percentage of retained timesteps
