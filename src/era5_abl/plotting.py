@@ -175,17 +175,16 @@ def plot_multi_dataset_pdf(
 
         # Check if variable depends on vertical model levels
         if "model_level" in data_array.sizes:
-            if target_height is None:
-                raise ValueError(
-                    f"Variable '{var_name}' varies with model level. You must specify 'target_height' [m AGL]."
+            if target_height is not None:
+                # Extract nearest index to target_height per timestep
+                k_indices = np.abs(ds["z"] - target_height).argmin(
+                    dim="model_level"
                 )
-
-            # Extract nearest index to target_height per timestep
-            k_indices = np.abs(ds["z"] - target_height).argmin(
-                dim="model_level"
-            )
-            extracted_vals = ds[var_name].isel(model_level=k_indices).values.flatten()
-            height_str = fr" at $z \approx {target_height}$ m AGL"
+                extracted_vals = ds[var_name].isel(model_level=k_indices).values.flatten()
+                height_str = fr" at $z \approx {target_height}$ m AGL"
+            elif target_height is None:
+                extracted_vals = ds[var_name].values.flatten()
+                height_str = fr" over all model levels"
         else:
             extracted_vals = data_array.values.flatten()
             height_str = ""
@@ -497,6 +496,8 @@ def plot_abl_top_vs_surface_hexbin(
         ax.set_ylabel(f"$\\Delta {temp_var.upper()}$ (ABL Top - Surface) [K]",fontsize=11)
         ax.set_title(f"{name} (n={len(y_val)})", fontsize=12)
         ax.set_xlim(left=0)
+        ax.axhline(0,c="k",ls="-",lw=0.8)
+        ax.axvline(0,c="k",ls="-",lw=0.8)
         ax.grid(True, linestyle="--", alpha=0.3)
 
     # Remove unused panels if number of datasets is not a perfect square
