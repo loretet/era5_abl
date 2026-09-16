@@ -30,6 +30,7 @@ from .filters import (
     filter_clouds,
     filter_stability, 
     filter_wind_dir,
+    filter_ds_below_BLH,
     print_filter_output,
     save_filtered_dataset,
 )
@@ -52,6 +53,7 @@ __all__ = [
     "filter_clouds",
     "filter_stability",
     "filter_wind_dir",
+    "filter_ds_below_BLH",
     "compute_wind_dir",
     "interpolate_to_height",
     "compute_PDF",
