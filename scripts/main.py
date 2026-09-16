@@ -125,6 +125,9 @@ if PROCESS_DATASETS:
         )
         era.print_filter_output(ds_ml_f2, ds_ml_f3, "Wind direction filtering")
 
+        # Filter model level dataset to only retain values below BLH
+        ds_ml_filtered = ds_ml_f4
+
         # Filtering is finished
         ds_ml_filtered = ds_ml_f3
         ds_srf_filtered = ds_srf_f3
