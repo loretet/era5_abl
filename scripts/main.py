@@ -59,7 +59,7 @@ SELECTED_LOCATIONS = [
     "ARM Southern Great Plains",
     "Summit Station",
     "Concordia Dome C",
-    # "ARM Eastern North Atlantic",
+    "ARM Eastern North Atlantic",
 ]
 site_configs = {key : SITE_CONFIGS[key] for key in SELECTED_LOCATIONS}
 
@@ -86,7 +86,11 @@ if PROCESS_DATASETS:
         ml_path = DATA_DIR / "raw_lvls_data" / site.model_level_filename
 
         # File prep and spatial averaging
-        ds_ml, ds_srf = era.prepare_dataset(str(ml_path), str(srf_path), location=loc, CDO_process=CDO_PROCESSING)
+        if CDO_PROCESSING:
+            ds_ml, ds_srf = era.prepare_dataset(str(ml_path), str(srf_path), location=loc)
+        else:
+            ds_srf = xr.open_dataset(f"{DATA_DIR}/{site.surface_filename.replace(".grib", "_CDO_processed.nc")}")
+            ds_ml = xr.open_dataset(f"{DATA_DIR}/{site.model_level_filename.replace(".grib", "_CDO_processed.nc")}")
 
         # Save unfiltered CDO-processed datasets
         if SAVE_CDO:
