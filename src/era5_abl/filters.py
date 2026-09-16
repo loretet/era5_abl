@@ -106,7 +106,7 @@ def filter_ds_below_BLH(ds: xr.Dataset, ds_srf: xr.Dataset) -> xr.Dataset:
     sub_blh_mask = (ds["z"] <= ds_srf["blh"].sel(time=ds.time))
 
     # Levels above BLH become NaN
-    ds_ml_filtered = ds.where(sub_blh_mask)
+    ds_ml_filtered = ds.where(sub_blh_mask, np.nan)
 
     return ds_ml_filtered
 
@@ -165,7 +165,9 @@ def save_filtered_dataset(
     filename = f"{site_name}_{dataset_type}_filtered.nc"
 
     output_path = output_dir / filename
-    ds_out.to_netcdf(output_path)
+    ds_out.to_netcdf(output_path, 
+        encoding={var: {"_FillValue": None} for var in ds.data_vars},
+    )
 
     print(f"Saved processed dataset: {output_path}")
     return output_path
