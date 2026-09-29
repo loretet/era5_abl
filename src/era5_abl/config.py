@@ -79,6 +79,10 @@ ERA5_SURFACE_VARIABLES = [
     "boundary_layer_height",
     "geopotential",
     "2m_dewpoint_temperature",
+    "skin_temperature", 
+    "instantaneous_surface_sensible_heat_flux", 
+    "friction_velocity", 
+    "land_sea_mask",
     "fsr",  # forecast roughness length for momentum
     "flsr"  # log of forecast roughness length for heat
 ]
