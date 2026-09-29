@@ -23,7 +23,7 @@ class SiteConfig:
 
 SITE_CONFIGS = {
     "Mace Head": SiteConfig(
-        area="53.25/9.5/53.00/9.75",
+        area="53.5/-10.0/53.25/-9.75",
         wind_sector=(180.0, 360.0),
         model_level_filename="MaceHead_lvls.grib",
         surface_filename="MaceHead_surface.grib",
@@ -35,25 +35,25 @@ SITE_CONFIGS = {
         surface_filename="Cabauw_surface.grib",
     ),
     "Summit Station": SiteConfig(
-        area="72.75/38.25/72.5/38.5",
+        area="72.75/-38.5/72.5/-38.25",
         wind_sector=(0.0, 360.0),
         model_level_filename="SummitStation_lvls.grib",
         surface_filename="SummitStation_surface.grib",
     ),
     "ARM Southern Great Plains": SiteConfig(
-        area="36.75/97.25/36.5/97.5",
+        area="36.75/-97.5/36.5/-97.25",
         wind_sector=(0.0, 360.0),
         model_level_filename="ARMGreatPlains_lvls.grib",
         surface_filename="ARMGreatPlains_surface.grib",    
     ),
     "Concordia Dome C": SiteConfig(
-        area="-75.25/123.0/-75.0/123.25",
+        area="-75.0/123.25/-75.25/123.5",
         wind_sector=(0.0, 360.0),
         model_level_filename="ConcordiaDomeC_lvls.grib",
         surface_filename="ConcordiaDomeC_surface.grib",    
     ),
     "ARM Eastern North Atlantic": SiteConfig(
-        area="39.25/28.0/39.0/28.25",
+        area="39.25/-28.25/39.0/-28.0",
         wind_sector=(0.0, 360.0),
         model_level_filename="ARMEasternNorthAtlantic_lvls.grib",
         surface_filename="ARMEasternNorthAtlantic_surface.grib",    
