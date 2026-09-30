@@ -12,7 +12,8 @@ def compute_ecmwf_pressure_and_height(ds_ml: xr.Dataset, ds_srf: xr.Dataset) -> 
     """
     Computes 3D/2D pressure [Pa] and height AGL [m] on ECMWF hybrid model levels
     using A_k and B_k coefficients embedded in the NetCDF dataset (from GRIB VCT).
-    Built with help of AI. NOTE: this reconstruction is APPROXIMATE.
+    Heights are geopotential heights of the FULL model levels, computed as in the IFS
+    (see ECMWF's compute_geopotential_on_ml.py). Built with help of AI.
     """
     g = GRAVITY
     R_d = DRY_AIR_GAS_CONSTANT
@@ -45,7 +46,6 @@ def compute_ecmwf_pressure_and_height(ds_ml: xr.Dataset, ds_srf: xr.Dataset) -> 
         a_full = vct[:n_half]
         b_full = vct[n_half:]
     else:
-        # Fallback: Default ECMWF L137 coefficient tables if missing from GRIB header
         raise ValueError(
             "Hybrid level coefficients (vct/hyai/hybi) not found in NetCDF dataset."
         )
@@ -65,19 +65,25 @@ def compute_ecmwf_pressure_and_height(ds_ml: xr.Dataset, ds_srf: xr.Dataset) -> 
     # Full-level pressure: midpoint of half-levels
     p_full = 0.5 * (p_half[:, :-1] + p_half[:, 1:])  # (time, 137)
 
-    # Compute virtual temperature
+    # Compute virtual temperature (same constant as ECMWF, Rv/Rd - 1 = 0.609133)
     q = ds_ml["q"].values
     t = ds_ml["t"].values
-    t_v = t * (1.0 + 0.608 * q)
+    t_v = t * (1.0 + 0.609133 * q)
 
-    # Hydrostatic integration from surface (TOA = level 0, Surface = level N-1)
+    # Hydrostatic integration from surface (TOA = level 0, Surface = level N-1), following
+    # IFS documentation (Part III, Eqs. 2.20-2.23) and ECMWF's compute_geopotential_on_ml.py (https://github.com/tkschuler/ERA5-Utils/blob/main/compute_geopotential_on_ml_updated.py)
     # dln_p = ln(p_{k+1/2} / p_{k-1/2})
-    dln_p = np.log(p_half[:, 1:] / p_half[:, :-1]) # WARNING: this is an approximation of the actual ECMWF algorithm!
-    dphi = R_d * t_v * dln_p  # geopotential increment per layer
+    dln_p = np.log(p_half[:, 1:] / p_half[:, :-1])
+    dphi = R_d * t_v * dln_p  # geopotential increment across each layer (half level to half level)
 
-    # Integrate from surface upwards (reverse sum along level axis)
-    phi_agl = np.cumsum(dphi[:, ::-1], axis=1)[:, ::-1]
-    z_agl_vals = phi_agl / g  # Height AGL [m]
+    # Geopotential AGL at the UPPER half level of each layer (k-1/2): integrate from surface upwards
+    phi_half_top = np.cumsum(dphi[:, ::-1], axis=1)[:, ::-1]
+    phi_half_bottom = phi_half_top - dphi  # lower half level (k+1/2); = 0 at the surface
+
+    # Full level k sits above the lower half level by alpha_k * R_d * T_v,k
+    alpha = 1.0 - p_half[:, :-1] / (p_half[:, 1:] - p_half[:, :-1]) * dln_p  # (only valid for k > 1, where alpha_1 = ln 2)
+    phi_full = phi_half_bottom + alpha * R_d * t_v
+    z_agl_vals = phi_full / g  # Height AGL of full model levels [m]
 
     # Format as xarray DataArrays matching ds_ml dimensions
     time_dim = "time" if "time" in ds_ml.sizes else "valid_time"
@@ -185,6 +191,10 @@ def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None)
     # Assign pressure as a dataset variable and height AGL as a 2D coordinate
     ds_ml["pressure"] = p_da
     ds_ml = ds_ml.assign_coords(z=(("time", "model_level"), z_agl_da.values))
+
+    # Drop hybrid coefficients (otherwise xarray's .where() in the
+    # filters broadcasts them along time and model_level, enlarging filesize)
+    ds_ml = ds_ml.drop_vars(["hyai", "hybi", "hyam", "hybm"], errors="ignore")
 
     # Compute virtual potential temperature
     ds_ml = compute_thetav(ds_ml)

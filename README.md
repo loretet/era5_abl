@@ -7,7 +7,7 @@ This package is a work in progress and will be used for a future publication.
 The package currently contains functions for:
 
 - preparation of spatially averaged ERA5 datasets;
-- reconstruction of model-level pressure and approximate height AGL;
+- reconstruction of model-level pressure and height AGL (full levels, as in the IFS);
 - gradient and bulk Richardson numbers;
 - comparison of diagnosed and ERA5 boundary-layer height;
 - cloud, stability, and wind-direction filtering;
@@ -55,8 +55,8 @@ ds_ml, ds_srf = eabl.prepare_dataset(
     location="Mace Head",
 )
 
-ds_ml = eabl.compute_grad_Ri_z(ds_ml)
-ds_ml = eabl.compute_bulk_Ri(ds_ml, ds_srf)
+ds_ml = eabl.compute_grad_Ri(ds_ml)
+ds_ml = eabl.compute_bulk_Ri(ds_ml, ds_srf, reference_height=None)
 ds_ml = eabl.compute_BLH_from_Ri_b(ds_ml, Ri_c=0.25)
 
 ds_ml, ds_srf = eabl.filter_clouds(ds_ml, ds_srf)
@@ -81,7 +81,5 @@ from era5_abl.filters import filter_stability
 ## Status
 
 This package is under active development. 
-
-The reconstructed model-level height is approximate and should be validated before using it for high-accuracy near-surface gradients.
 
 The usage of CDO is debatable but much faster than Metview.
