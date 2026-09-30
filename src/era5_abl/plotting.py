@@ -93,14 +93,7 @@ def plot_abl_top_vs_surface_scatter_contour(
         ).values
 
         # 2. Extract Wind Speed at BLH for each timestep
-        n_times = ds.sizes["time"]
-        u_blh = np.zeros(n_times)
-
-        for t in range(n_times):
-            z_t = ds["z"].isel(time=t).values
-            blh_t = ds_srf["blh"].isel(time=t).values
-            k_idx = np.abs(z_t - blh_t).argmin()
-            u_blh[t] = ds["wind_speed"].isel(time=t, model_level=k_idx).values
+        u_blh = interpolate_to_height(ds, "wind_speed", ds_srf, target_height=None).values
 
         # Filter out NaN/Inf values if present
         valid_mask = np.isfinite(u_blh) & np.isfinite(delta_T)
@@ -137,7 +130,7 @@ def plot_abl_top_vs_surface_scatter_contour(
 
     ax.set_xlabel("Wind speed at BLH [m/s]", fontsize=11)
     ax.set_ylabel(
-        f"$\Delta {temp_var.upper()}$ (ABL Top - Surface) [K]", fontsize=11
+        f"$\\Delta${temp_var} (ABL Top - Surface) [K]", fontsize=11
     )
     ax.set_title(
         "Top-of-the-ABL wind speed vs. Temperature difference",
@@ -451,17 +444,7 @@ def plot_abl_top_vs_surface_hexbin(
         ).values
 
         # Extract Wind Speed at BLH for each timestep
-        n_times = ds.sizes["time"]
-        u_blh = np.zeros(n_times)
-
-        for t in range(n_times):
-            z_t = ds["z"].isel(time=t).values
-            blh_t = ds_srf["blh"].isel(time=t).values
-            k_idx = np.abs(z_t - blh_t).argmin()
-            u_blh[t] = ds["wind_speed"].isel(
-                time=t,
-                model_level=k_idx,
-            ).values
+        u_blh = interpolate_to_height(ds, "wind_speed", ds_srf, target_height=None).values
 
         # Filter NaN / Inf values
         valid_mask = (
@@ -493,7 +476,7 @@ def plot_abl_top_vs_surface_hexbin(
         cbar = fig.colorbar(hb, ax=ax)
         cbar.set_label("Number of observations")
         ax.set_xlabel("Wind speed at BLH [m/s]", fontsize=11)
-        ax.set_ylabel(f"$\\Delta {temp_var.upper()}$ (ABL Top - Surface) [K]",fontsize=11)
+        ax.set_ylabel(f"$\\Delta${temp_var} (ABL Top - Surface) [K]",fontsize=11)
         ax.set_title(f"{name} (n={len(y_val)})", fontsize=12)
         ax.set_xlim(left=0)
         ax.axhline(0,c="k",ls="-",lw=0.8)
