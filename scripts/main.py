@@ -28,24 +28,22 @@ ML_DATA_RETRIEVAL = False
 # Wether to process the data (filter, add multiple variables...)
 PROCESS_DATASETS = True
 # Whether to carry out the CDO processing (fldmean):
-CDO_PROCESSING = True
-# Save CDO-processed datasets. 
-SAVE_CDO = True
+CDO_PROCESSING = False
+# Whether to save CDO-processed datasets. 
+SAVE_CDO = False
 # Whether to save the filtered datasets or not:
 SAVE_FILTERED_DATASETS = True
 # Date interval considered:
 DATES = "2020-01-01/2021-12-31"
 # Number of levels with Ri higher than 0.25 to compute BLH
-RIb_PERSISTENCE = 5
+RIb_PERSISTENCE = 2
 # Set filtering parameters (to filter for neutral and stable cloud-free layers, in this example)
 filter_params = {
     "lcc_threshold": 0.15,                # Maximum amount of Low Level Clouds allowed by the cloud filtering
     "cloud_window_hours": 2,              # Amount of hours where the lcc_threshold must be maintained in cloud filtering
-    "ri_surf_min": -2e-4,                 # Minimum/maximum Richardson number at height ri_surf_min_height retained by the stability filtering
-    "ri_surf_min_height": 20.0,       # Height at which the minimum/maximum surface Richardson number is computed for stability filtering
-    "grad_tol": -2e-4,                            # Minimum/maximum Richardson number retained by the stability filtering
-    "min_valid_grad_fraction": 0.8,      # Minimum fraction of d(theta_v)/dz that must be above grad_tol
-    "grad_smooth_window": 3,             # Gradient smoothing windows for stability filtering 
+    "ri_surf_min": 0.0,                   # Minimum bulk Richardson number (Ri_b_srf) at height ri_surf_min_height retained by the stability filtering
+    "ri_surf_min_height": 20.0,           # Reference height [m] for the surface-layer Ri_b (stability filtering and transfer functions)
+    "dtheta_tol": 0.0,                    # [K] theta_v(z) - theta_v_2m must be >= -dtheta_tol at all levels below BLH (>0 keeps near-neutral layers)
     "Ri_c": 0.25,               # Critical Richardson number for stability filtering and computation
     "wind_dir_min_deg": 0,      # Wind direction filtering,  lower value in deg  (placeholder! Updated later where needed)
     "wind_dir_max_deg": 360,    # Wind direction filtering, higher value in deg (placeholder! Updated later where needed)
@@ -89,13 +87,15 @@ if PROCESS_DATASETS:
         if CDO_PROCESSING:
             ds_ml, ds_srf = era.prepare_dataset(str(ml_path), str(srf_path), location=loc)
         else:
-            ds_srf = xr.open_dataset(f"{DATA_DIR}/{site.surface_filename.replace(".grib", "_CDO_processed.nc")}")
-            ds_ml = xr.open_dataset(f"{DATA_DIR}/{site.model_level_filename.replace(".grib", "_CDO_processed.nc")}")
+            # NB: files processed before the height fix (Sept 2026) carry the old z -> re-run with CDO_PROCESSING = True once
+            ds_srf = xr.open_dataset(f"{DATA_DIR}/{site.surface_filename.replace('.grib', '_CDO_processed.nc')}")
+            ds_ml = xr.open_dataset(f"{DATA_DIR}/{site.model_level_filename.replace('.grib', '_CDO_processed.nc')}")
+            ds_ml = ds_ml.drop_vars(["hyai", "hybi", "hyam", "hybm"], errors="ignore")  # avoids ~1 GB filtered files
 
         # Save unfiltered CDO-processed datasets
         if SAVE_CDO:
-            ds_srf.to_netcdf(f"{DATA_DIR}/{site.surface_filename.replace(".grib", "_CDO_processed.nc")}")
-            ds_ml.to_netcdf(f"{DATA_DIR}/{site.model_level_filename.replace(".grib", "_CDO_processed.nc")}")
+            ds_srf.to_netcdf(f"{DATA_DIR}/{site.surface_filename.replace('.grib', '_CDO_processed.nc')}")
+            ds_ml.to_netcdf(f"{DATA_DIR}/{site.model_level_filename.replace('.grib', '_CDO_processed.nc')}")
 
         # Cloud filtering
         ds_ml_f0, ds_srf_f0 = ds_ml.copy(), ds_srf.copy()
@@ -111,8 +111,7 @@ if PROCESS_DATASETS:
         ds_ml_f1 = era.compute_BLH_from_Ri_b(ds_ml_f1, Ri_c=filter_params["Ri_c"], persistence=RIb_PERSISTENCE)
         ds_ml_f2, ds_srf_f2 = era.filter_stability(ds_ml_f1, ds_srf_f1,
             ri_surf_min=filter_params["ri_surf_min"], ri_surf_min_height=filter_params["ri_surf_min_height"], 
-            grad_tol=filter_params["grad_tol"], min_valid_fraction=filter_params["min_valid_grad_fraction"], 
-            smooth_window=filter_params["grad_smooth_window"]
+            dtheta_tol=filter_params["dtheta_tol"],
         )
         era.print_filter_output(ds_ml_f1, ds_ml_f2, "Stability filtering")
 
@@ -126,10 +125,10 @@ if PROCESS_DATASETS:
         era.print_filter_output(ds_ml_f2, ds_ml_f3, "Wind direction filtering")
 
         # Filter model level dataset to only retain values below BLH
-        ds_ml_filtered = ds_ml_f4
+        ds_ml_f4 = era.filter_ds_below_BLH(ds_ml_f3, ds_srf_f3)
 
         # Filtering is finished
-        ds_ml_filtered = ds_ml_f3
+        ds_ml_filtered = ds_ml_f4
         ds_srf_filtered = ds_srf_f3
         era.print_filter_output(ds_ml_f0, ds_ml_f3, "Total filtering results from the initial dataset")
 
@@ -170,8 +169,8 @@ if PROCESS_DATASETS:
 else:
     for loc, site in site_configs.items():
         # Open already-stored datasets for multi-site comparisons
-        ds_ml_dict[loc] = xr.open_dataset(filtered_dir / f"{loc.replace(" ","")}_lvls_filtered.nc")
-        ds_srf_dict[loc] = xr.open_dataset(filtered_dir / f"{loc.replace(" ","")}_srf_filtered.nc")
+        ds_ml_dict[loc] = xr.open_dataset(filtered_dir / f"{loc.replace(' ','')}_lvls_filtered.nc")
+        ds_srf_dict[loc] = xr.open_dataset(filtered_dir / f"{loc.replace(' ','')}_srf_filtered.nc")
 
 
 # %% Plotting & Analysis
@@ -183,14 +182,19 @@ ax.set_xlim(left=0,right=2000)
 # Example 2 (time-height variable): PDF comparison 
 _,ax=plot_multi_dataset_pdf(ds_ml_dict, var_name="Ri_g", target_height=20.0, bins="fd", density=True)
 ax.set_xlim(left=0,right=0.5)
-# ax.set_ylim(top=5,bottom=0.0)
+ax.axvline(0.25,c="k")
+_,ax=plot_multi_dataset_pdf(ds_ml_dict, var_name="Ri_g", target_height=None, bins="fd", density=True)
+ax.set_xlim(left=0,right=1.5)
+ax.axvline(0.25,c="k")
 
-# Example 3: Scatter/KDE of Delta T vs Wind speed at BLH
-_,ax=plot_abl_top_vs_surface_scatter_contour(ds_ml_dict, ds_srf_dict, temp_var="t")
-ax.axhline(0.0,c="k",alpha=0.8)
+
+# Example 3: Scatter/KDE of Delta theta_v vs Wind speed at BLH (use theta_v, not t: t decreases with height even in neutral layers)
+_,ax=plot_abl_top_vs_surface_scatter_contour(ds_ml_dict, ds_srf_dict, temp_var="theta_v")
+ax.set_ylim(bottom=0)
+ax.set_xlim(left=0)
 
 # Example 4: Hexbin plot showing the toa-surface difference for every location separately
-_,axs = plot_abl_top_vs_surface_hexbin(ds_ml_dict, ds_srf_dict, temp_var="t", gridsize=40)
+_,axs = plot_abl_top_vs_surface_hexbin(ds_ml_dict, ds_srf_dict, temp_var="theta_v", gridsize=40)
 for ax in axs:
     ax.set_xlim(left=0, right=30)
     ax.set_ylim(top=6.1, bottom=-6)
@@ -205,12 +209,37 @@ for f in ["fm","fh"]:
 # Example 6: Single timestamp vertical profile
 plot_vertical_profile(ds_ml_dict, "t", time="2020-07-15T12:00:00")
 
-# Example 7: Plot surface variable in time
-
-# Example 8: Time-Range variable profile sequence 
+# Example 7: Time-Range variable profile sequence 
 # Create one-entry dict to oplot only one location (can also be used with the entire dictionary, but might be confusing)
 target_loc = "Mace Head"  
 dict_from_loc = {target_loc: ds_ml_dict[target_loc]} 
 plot_vertical_profile(dict_from_loc, "t", time_range=("2020-07-15T06:00:00", "2020-07-25T12:00:00"))
 
 #%%
+
+###############################
+#### work in progress part ####
+###############################
+
+#%%
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+for v,var in enumerate(["z0", "z0h"]):
+    fig,axs = plt.subplots(3,2,figsize=(10,9))
+    axs = axs.flatten()
+    fig.suptitle(fr"PDF of {['','thermal'][v]} roughness length ${var}$")
+    for k,key in enumerate(ds_srf_dict.keys()):
+        ax = axs[k]
+        ds = ds_srf_dict[key]
+        ax.hist(ds[var])
+        ax.set_title(f"{key},  median: {np.median(ds[var].values.flatten()):.1e} m") 
+    plt.tight_layout()
+
+_,ax=plot_multi_dataset_pdf(ds_ml_dict, var_name="wind_speed", target_height=None, bins="fd", density=True)
+_,ax=plot_multi_dataset_pdf(ds_ml_dict, var_name="Ri_b_srf", target_height=None, bins="fd", density=False)
+ax.set_xlim(left=0,right=1)
+ax.axvline(0.25,c="k")
+
+# %%
