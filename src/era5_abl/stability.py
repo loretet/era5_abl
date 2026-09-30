@@ -138,7 +138,7 @@ def compute_difference_surface_top_ABL(ds_ml: xr.Dataset, ds_srf: xr.Dataset, va
     function of time. The top of the ABL is defined by the BLH (Boundary Layer Height) variable.
     """
     # Top of ABL variable (interpolate/extract at BLH)
-    toa_var = interpolate_to_height(ds_ml, var_name, ds_srf)
+    toa_var = interpolate_to_height(ds_ml, var_name, ds_srf, target_height=None)
 
     # Surface variable
     if var_name == "t":
