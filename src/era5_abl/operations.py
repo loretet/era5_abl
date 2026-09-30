@@ -82,9 +82,15 @@ def interpolate_to_height(ds: xr.Dataset, var_name: str, ds_srf: xr.Dataset = No
     for t in range(ds.sizes["time"]):
         z_t = ds["z"].isel(time=t).values
         var_t = ds[var_name].isel(time=t).values
+        # Ignore NaN levels (e.g. levels above BLH after filter_ds_below_BLH), otherwise np.interp returns NaN
+        finite = np.isfinite(z_t) & np.isfinite(var_t)
+        if not finite.any():
+            values[t] = np.nan
+            continue
+        z_t, var_t = z_t[finite], var_t[finite]
         
         if use_blh:
-            if ds_srf != None:
+            if ds_srf is not None:
                 height = float(ds_srf["blh"].isel(time=t))
             else:
                 raise ValueError("interpolate_to_height: ds_srf not provided (BLH impossible to retrieve)")
