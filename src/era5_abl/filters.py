@@ -13,7 +13,7 @@ def filter_clouds(ds: xr.Dataset, ds_srf: xr.Dataset, lcc_thresh: float = 0.1, w
     # Get low cloud covers (potentially, the datasets also have middle nad high loud cover)
     lcc = ds_srf["lcc"] # shape (time,)
 
-    # Check LCC on the current hour and the previous 3 (this assumes 3/4 hours are enough to ignore effect of cloud cover on turbulence)
+    # Check LCC on the current hour and the previous window_hours (assumes this is enough to ignore effect of cloud cover on turbulence)
     window_size = window_hours + 1
     lcc_rolling = lcc.rolling(time=window_size, min_periods=window_size).max()
 
@@ -25,50 +25,35 @@ def filter_clouds(ds: xr.Dataset, ds_srf: xr.Dataset, lcc_thresh: float = 0.1, w
     return ds_ml_filtered, ds_srf_filtered
 
 def filter_stability(ds: xr.Dataset, ds_srf: xr.Dataset, ri_surf_min: float = 0.0, 
-                     ri_surf_min_height: float = 20.0, grad_tol: float = -2e-4, min_valid_fraction: float = 0.8, 
-                     smooth_window: int = 3
+                     ri_surf_min_height: float = 20.0, dtheta_tol: float = 0.0,
                      ) -> tuple[xr.Dataset, xr.Dataset]:
     """
     Retain times where:
-    1. Near-surface Ri is at least ri_surface_min.
-    2. At least required_valid_fraction % of sub-BLH layers satisfy
-       smoothened( d(theta_v)/dz ) >= gradient_tolerance [K/m].
+    1. The surface-layer bulk Richardson number (Ri_b_srf, i.e. the same quantity used by the 
+       transfer functions) at ri_surf_min_height is at least ri_surf_min.
+    2. The whole layer below BLH is stable with respect to the surface ("parcel" criterion):
+       theta_v(z) - theta_v_2m >= -dtheta_tol [K] at every model level below BLH. A surface parcel is 
+       then negatively buoyant everywhere in the ABL, which removes convective and transition 
+       (partly mixed) layers without using noisy vertical derivatives. dtheta_tol > 0 (e.g. 0.1K) keeps near-neutral layers.
+    3. BLH is above ri_surf_min_height (the reference height lies inside the ABL).
+    Requires Ri_b_srf (compute_bulk_Ri with reference_height=None) and theta_v_2m.
     """
 
-    # Get surface quantities
-    ri_20m = interpolate_to_height(ds,"Ri_g", None, ri_surf_min_height)
-    mask_surf = (ri_20m >= ri_surf_min)
+    # 1. Surface layer: bulk Ri at the reference height
+    ri_ref = interpolate_to_height(ds, "Ri_b_srf", None, ri_surf_min_height)
+    mask_surf = (ri_ref >= ri_surf_min)
 
-    # Smooth out theta nad compute gradient
-    theta_smooth = ds.theta_v.rolling(model_level = smooth_window, 
-                                      center = True, 
-                                      min_periods = 1  # to avoid smothign from edge Nans
-                                    ).mean()
-    dt_dz = np.full_like(ds["theta_v"].values, np.nan)
-
-    for t in range(ds.sizes["time"]):
-        dt_dz[t,:] = np.gradient(
-                                theta_smooth.isel(time=t).values,
-                                ds.z.isel(time=t).values
-                            )
-
-    # Assign the smoothed gradient to the dataset
-    ds = ds.assign(dt_dz=(("time","model_level"), dt_dz))
-
-    # Mask to consider only layers below BLH
+    # 2. Whole ABL: theta_v excess with respect to the surface at every level below BLH
     blh = ds_srf["blh"]
     mask_sub_blh = ds["z"] < blh
+    dtheta_sub_blh = (ds["theta_v"] - ds_srf["theta_v_2m"]).where(mask_sub_blh)
+    mask_abl = dtheta_sub_blh.min(dim="model_level") >= -dtheta_tol   # False if no level is below BLH
 
-    # Loop through time to find valid timesteps
-    dtdz_sub_blh = ds.dt_dz.where(mask_sub_blh)
-
-    # Compute fraction of retained timesteps and obtain mask
-    n_sub_blh = dtdz_sub_blh.notnull().sum(dim="model_level")  # total 
-    n_valid = (dtdz_sub_blh >= grad_tol).sum(dim="model_level") # respecting grad_tol
-    valid_times = (n_sub_blh > 0) & ((n_valid / n_sub_blh) >= min_valid_fraction)
+    # 3. Reference height inside the ABL
+    mask_blh = blh > ri_surf_min_height
 
     # Apply final masking
-    ds_ml_filtered = ds.where(mask_surf & valid_times, drop=True)
+    ds_ml_filtered = ds.where(mask_surf & mask_abl & mask_blh, drop=True)
     ds_srf_filtered = ds_srf.sel(time=ds_ml_filtered["time"])
 
     return ds_ml_filtered, ds_srf_filtered
