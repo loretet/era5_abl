@@ -15,7 +15,7 @@ POISSON_EXPONENT = 0.2854        # R_d / c_p approximation
 
 @dataclass(frozen=True)
 class SiteConfig:
-    area: str
+    area: str    # "N/W/S/E" (longitudes from -180 to 180): grid point(s) of the site, extracted from its retrieval area
     wind_sector: tuple[float, float]
     model_level_filename: str
     surface_filename: str
@@ -99,3 +99,25 @@ ERA5_MODEL_LEVEL_PARAMS = "130/131/132/133/152"
 ERA5_DELTA_TIME = "00/to/23/by/1"
 ERA5_GRID = "0.25/0.25"
 ERA5_FORMAT = "grib"
+
+# Areas ("N/W/S/E") requested from the CDS for the model level data. A few requests over a big area are more
+# efficient than many requests over small ones (CDS support, Oct 2026), so the sites are not requested one by one:
+# each site is extracted locally from the area that contains it (see preprocessing.extract_site_data).
+ERA5_RETRIEVAL_AREAS = {
+    "NorthernSites": "72.75/-97.75/36.25/5.75",       # all the sites except Concordia Dome C
+    # "ConcordiaDomeC": "-75.0/123.25/-75.0/123.25",    # too far from the others: requested as a single grid point
+}
+# The CDS rejects model level requests longer than ~15 days ("cost limits exceeded"). 17 days are tested to work.
+ERA5_MAX_DAYS_PER_REQUEST = 16
+# With more than ~15 requests at the same time the downloads get slower.
+ERA5_MAX_PARALLEL_REQUESTS = 15
+
+
+def get_retrieval_area(site: SiteConfig) -> str:
+    """Name of the retrieval area (in ERA5_RETRIEVAL_AREAS) that contains the site."""
+    north, west, south, east = (float(x) for x in site.area.split("/"))
+    for name, area in ERA5_RETRIEVAL_AREAS.items():
+        area_north, area_west, area_south, area_east = (float(x) for x in area.split("/"))
+        if area_south <= south and north <= area_north and area_west <= west and east <= area_east:
+            return name
+    raise ValueError(f"No area in ERA5_RETRIEVAL_AREAS contains the site area {site.area}: add one in config.py.")

@@ -1,10 +1,16 @@
 import xarray as xr
 import numpy as np
-import os, subprocess
+import os, subprocess, tempfile
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from .config import (
     GRAVITY,
-    DRY_AIR_GAS_CONSTANT
+    DRY_AIR_GAS_CONSTANT,
+    ERA5_RETRIEVAL_AREAS,
+    SiteConfig,
+    get_retrieval_area,
 )
+from .data_retrieve import model_level_paths
 from .operations import compute_thetav
 
 
@@ -140,6 +146,59 @@ def standardize_surface_varnames(ds: xr.Dataset) -> xr.Dataset:
     }
 
     return ds.rename(rename_dict)
+
+def extract_site_data(
+    site: SiteConfig,
+    dates: str,
+    data_dir: str | Path,
+    output_path: str | Path,
+    max_workers: int = 4,
+) -> None:
+    """
+    Extracts the grid point(s) of one site (site.area) from the model level files of the retrieval area that
+    contains it (downloaded with data_retrieve.parallel_retrieval), and merges them in time via CDO.
+    The result is one GRIB file for the whole period, as if site.area had been requested directly.
+    The files of the area are big, so max_workers of them are processed at the same time.
+    """
+    area_name = get_retrieval_area(site)
+    area_paths = model_level_paths(area_name, dates, data_dir)
+
+    # All the pieces must be there, otherwise the merged file would have gaps in time
+    missing = [path.name for path in area_paths if not path.exists()]
+    if missing:
+        raise FileNotFoundError(
+            f"{len(missing)} of the {len(area_paths)} model level files of area {area_name} are missing in "
+            f"{area_paths[0].parent} (retrieve them first, and note that the dates must cover whole months): {missing}"
+        )
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    site_box = [float(x) for x in site.area.split("/")]
+    area_box = [float(x) for x in ERA5_RETRIEVAL_AREAS[area_name].split("/")]
+
+    with tempfile.TemporaryDirectory(dir=output_path.parent) as tmp_dir:
+        if site_box == area_box:
+            # The area is the site itself: nothing to select (and CDO cannot select from a single grid point)
+            site_paths = area_paths
+        else:
+            # Select the site in every file first (small files), then merge them: the big files are never merged.
+            # CDO wants lon1,lon2,lat1,lat2. The small margin makes sure that grid points on the edge of the box are kept
+            north, west, south, east = site_box
+            box = f"{west - 0.01},{east + 0.01},{south - 0.01},{north + 0.01}"
+            print(f"Executing on {len(area_paths)} files of area {area_name}: cdo sellonlatbox,{box}")
+
+            def select_site(area_path):
+                site_path = Path(tmp_dir) / area_path.name
+                cmd = f'cdo -s sellonlatbox,{box} "{area_path}" "{site_path}"'
+                subprocess.run(cmd, shell=True, check=True)
+                return site_path
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                site_paths = list(executor.map(select_site, area_paths))
+
+        cmd = "cdo -O mergetime " + " ".join(f'"{path}"' for path in site_paths) + f' "{output_path}"'
+        print(f"Executing: cdo -O mergetime [{len(site_paths)} files of {area_name}] \"{output_path}\"")
+        subprocess.run(cmd, shell=True, check=True)
 
 def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None) -> tuple[xr.Dataset, xr.Dataset]:
     """

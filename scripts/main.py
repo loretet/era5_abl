@@ -24,9 +24,12 @@ DATA_DIR = Path(
 )
 # Whether to retrieve data with CDS API or not:
 SRF_DATA_RETRIEVAL = False
-ML_DATA_RETRIEVAL = False
+ML_DATA_RETRIEVAL = True
 # Wether to process the data (filter, add multiple variables...)
 PROCESS_DATASETS = True
+# Whether to extract the locations from the model level files of the retrieval areas (CDO sellonlatbox and mergetime).
+# Needed once after the retrieval: it creates one GRIB file per location in raw_lvls_data
+ML_SITE_EXTRACTION = False
 # Whether to carry out the CDO processing (fldmean):
 CDO_PROCESSING = False
 # Whether to save CDO-processed datasets. 
@@ -34,7 +37,7 @@ SAVE_CDO = False
 # Whether to save the filtered datasets or not:
 SAVE_FILTERED_DATASETS = True
 # Date interval considered:
-DATES = "2020-01-01/2021-12-31"
+DATES = "2020-01-01/2020-01-17"
 # Number of levels with Ri higher than 0.25 to compute BLH
 RIb_PERSISTENCE = 2
 # Set filtering parameters (to filter for neutral and stable cloud-free layers, in this example)
@@ -63,11 +66,13 @@ site_configs = {key : SITE_CONFIGS[key] for key in SELECTED_LOCATIONS}
 
 
 #%% Retrieve ERA5 data
+# Model level data are retrieved in pieces of ~15 days, for the areas (ERA5_RETRIEVAL_AREAS in era5_abl/src/config.py)
+# that contain the selected locations. It takes long: better to run scripts/download_era5.py in the background.
 era.parallel_retrieval(
     site_names=SELECTED_LOCATIONS,
     dates=DATES,
     output_dir=DATA_DIR,
-    max_workers=len(SELECTED_LOCATIONS)*2,
+    max_workers=15,     # with more requests at the same time the downloads get slower
     retrieve_srf_data=SRF_DATA_RETRIEVAL,
     retrieve_ml_data=ML_DATA_RETRIEVAL,
 )
@@ -82,6 +87,10 @@ if PROCESS_DATASETS:
         print(f"\n--- Processing Location: {loc} ---")
         srf_path = DATA_DIR / "raw_surface_data" / site.surface_filename
         ml_path = DATA_DIR / "raw_lvls_data" / site.model_level_filename
+
+        # Extract the location from the files of its retrieval area (one GRIB file for the whole period)
+        if ML_SITE_EXTRACTION:
+            era.extract_site_data(site, dates=DATES, data_dir=DATA_DIR, output_path=ml_path)
 
         # File prep and spatial averaging
         if CDO_PROCESSING:
