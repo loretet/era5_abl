@@ -27,8 +27,9 @@ SRF_DATA_RETRIEVAL = False
 ML_DATA_RETRIEVAL = True
 # Wether to process the data (filter, add multiple variables...)
 PROCESS_DATASETS = True
-# Whether to extract the locations from the model level files of the retrieval areas (CDO sellonlatbox and mergetime).
-# Needed once after the retrieval: it creates one GRIB file per location in raw_lvls_data
+# Whether to build one model level GRIB file per location out of the pieces downloaded by scripts/download_era5.py
+# (CDO mergetime; pieces that were not extracted yet are cut out of the area files with sellonlatbox).
+# Not needed if download_era5.py already ended with "The locations are ready in raw_lvls_data"
 ML_SITE_EXTRACTION = False
 # Whether to carry out the CDO processing (fldmean):
 CDO_PROCESSING = False
@@ -59,15 +60,16 @@ SELECTED_LOCATIONS = [
     "Mace Head",
     "ARM Southern Great Plains",
     "Summit Station",
-    "Concordia Dome C",
+    # "Concordia Dome C",
     "ARM Eastern North Atlantic",
 ]
 site_configs = {key : SITE_CONFIGS[key] for key in SELECTED_LOCATIONS}
 
 
 #%% Retrieve ERA5 data
-# Model level data are retrieved in pieces of ~15 days, for the areas (ERA5_RETRIEVAL_AREAS in era5_abl/src/config.py)
-# that contain the selected locations. It takes long: better to run scripts/download_era5.py in the background.
+# NB: this downloads everything in one go and takes days. For the model level data use scripts/download_era5.py
+# instead: it sends the requests to the CDS (which works on them also while the computer is off), downloads the
+# results afterwards, and extracts the locations from each file as soon as it arrives.
 era.parallel_retrieval(
     site_names=SELECTED_LOCATIONS,
     dates=DATES,
