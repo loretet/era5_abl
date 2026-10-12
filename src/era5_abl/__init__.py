@@ -3,6 +3,7 @@ ERA5 atmospheric boundary-layer diagnostics and filtering.
 """
 
 from .preprocessing import (
+    extract_sites_from_file,
     extract_site_data,
     prepare_dataset,
 )
@@ -12,6 +13,8 @@ from .data_retrieve import (
     retrieve_model_level_data,
     split_dates,
     parallel_retrieval,
+    submit_model_level_requests,
+    fetch_model_level_requests,
 )
 
 from .operations import (
@@ -47,6 +50,7 @@ from .surface_exchange import (
 )
 
 __all__ = [
+    "extract_sites_from_file",
     "extract_site_data",
     "prepare_dataset",
     "compute_grad_Ri",
@@ -71,6 +75,8 @@ __all__ = [
     "retrieve_model_level_data",
     "split_dates",
     "parallel_retrieval",
+    "submit_model_level_requests",
+    "fetch_model_level_requests",
     "print_filter_output",
     "save_filtered_dataset",
     ]
