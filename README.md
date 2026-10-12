@@ -46,23 +46,38 @@ print(site.wind_sector)
 
 ## Data retrieval
 
-Surface data are requested from the CDS site by site. Model level data are instead requested for a few big
-areas (`ERA5_RETRIEVAL_AREAS` in `era5_abl/config.py`) in pieces of about 15 days, because the CDS rejects longer
-requests and handles a few big requests better than many small ones. The sites are then extracted locally:
+Surface data are requested from the CDS site by site. Model level data are instead requested for a few areas
+(`ERA5_RETRIEVAL_AREAS` in `era5_abl/config.py`) in pieces of about 15 days, because the CDS rejects longer
+requests and handles few big requests better than many small ones. Each location is then cut out of the area
+files locally, so a new location needs no new download if an area already contains it.
+
+`scripts/download_era5.py` does all of this. The requests are first sent to the CDS, which works on them
+(hours to days) whether the computer is on or not, and the results are downloaded afterwards:
+
+```bash
+python download_era5.py   # SUBMIT_REQUESTS = True, FETCH_REQUESTS = False: send the requests, then switch off
+python download_era5.py   # SUBMIT_REQUESTS = False, FETCH_REQUESTS = True: download, extract, delete
+```
+
+Each downloaded area file is deleted as soon as the locations are extracted from it (`DELETE_AREA_FILES`), so
+the disk only ever holds one area file plus the locations. Both steps can be interrupted and started again: the
+request ids are in `ERA5_data/raw_lvls_data/cds_requests.json`, and finished files are never downloaded twice.
+The CDS does not keep results forever, so fetch them within a few days.
+
+The same functions can also be called directly:
 
 ```python
 import era5_abl as eabl
 from era5_abl.config import SITE_CONFIGS
 
-# 1. Download (hours to days): better with `nohup python scripts/download_era5.py > download.log 2>&1 &`
-eabl.parallel_retrieval(dates="2020-01-01/2021-12-31", output_dir=data_dir, retrieve_srf_data=False)
-
-# 2. One GRIB file per site (CDO sellonlatbox + mergetime), which is the input of prepare_dataset
+eabl.submit_model_level_requests(dates="2020-01-01/2021-12-31", output_dir=data_dir)
+eabl.fetch_model_level_requests(dates="2020-01-01/2021-12-31", output_dir=data_dir)
 eabl.extract_site_data(SITE_CONFIGS["Mace Head"], dates="2020-01-01/2021-12-31",
                        data_dir=data_dir, output_path=model_level_path)
 ```
 
-The area files are in `data_dir/raw_lvls_data/<area name>/`. A new site only needs a download if no area contains it.
+`parallel_retrieval` still downloads everything in one blocking go (used for the surface data), but for model
+levels the two steps above are the better route.
 
 ## Basic usage
 
