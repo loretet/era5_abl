@@ -46,12 +46,14 @@ SITE_CONFIGS = {
         model_level_filename="ARMGreatPlains_lvls.grib",
         surface_filename="ARMGreatPlains_surface.grib",    
     ),
-    "Concordia Dome C": SiteConfig(
-        area="-75.0/123.25/-75.0/123.25",
-        wind_sector=(0.0, 360.0),
-        model_level_filename="ConcordiaDomeC_lvls.grib",
-        surface_filename="ConcordiaDomeC_surface.grib",    
-    ),
+    # Dropped (Oct 2026): the CDS allows at most 150 queued requests, and Concordia is too far
+    # from the other sites to share a retrieval area. Re-enable here and in ERA5_RETRIEVAL_AREAS.
+    #    "Concordia Dome C": SiteConfig(
+    #        area="-75.0/123.25/-75.0/123.25",
+    #        wind_sector=(0.0, 360.0),
+    #        model_level_filename="ConcordiaDomeC_lvls.grib",
+    #        surface_filename="ConcordiaDomeC_surface.grib",    
+    #    ),
     "ARM Eastern North Atlantic": SiteConfig(
         area="39.0/-28.0/39.0/-28.0",
         wind_sector=(0.0, 360.0),
@@ -104,8 +106,19 @@ ERA5_FORMAT = "grib"
 # efficient than many requests over small ones (CDS support, Oct 2026), so the sites are not requested one by one:
 # each site is extracted locally from the area that contains it (see preprocessing.extract_site_data).
 ERA5_RETRIEVAL_AREAS = {
-    "NorthernSites": "72.75/-97.75/36.25/5.75",       # all the sites except Concordia Dome C
-    # "ConcordiaDomeC": "-75.0/123.25/-75.0/123.25",    # too far from the others: requested as a single grid point
+    # One single box around all the sites. ERA5 model level fields are archived globally and the "area" is only
+    # applied afterwards, in the post-processing, so a small area costs MARS exactly as much tape reading as a
+    # big one: asking for several areas over the same dates just makes the robot fetch the same tape again and
+    # again, which lowers the priority of the requests (ECMWF support, Oct 2026). One box over all the sites is
+    # therefore one tape read per piece instead of three, and the sites are cut out of it locally afterwards
+    # (see preprocessing.extract_sites_from_file). ~5 GB per request, well under the 20 GB the CDS asks for.
+    "AllSites": "72.5/-97.5/36.5/5.0",    # Summit Station, Mace Head, Cabauw, ARM ENA, ARM Great Plains
+    # Previous split, kept in case the single box turns out to be too much to transfer (it is ~10 times more
+    # data in total, even though it is fewer requests):
+    # "Europe": "53.25/-10.0/52.0/5.0",                 # Mace Head, Cabauw
+    # "GreenlandAzores": "72.5/-38.5/39.0/-28.0",       # Summit Station, ARM Eastern North Atlantic
+    # "ARMGreatPlains": "36.5/-97.5/36.5/-97.5",        # too far from the others: single grid point
+    # "ConcordiaDomeC": "-75.0/123.25/-75.0/123.25",    # dropped: the CDS allows at most 150 queued requests
 }
 # The CDS rejects model level requests longer than ~15 days ("cost limits exceeded"). 17 days are tested to work.
 ERA5_MAX_DAYS_PER_REQUEST = 16

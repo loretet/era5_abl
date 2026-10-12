@@ -1,6 +1,6 @@
 import xarray as xr
 import numpy as np
-import os, subprocess, tempfile
+import os, shutil, subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from .config import (
@@ -10,7 +10,7 @@ from .config import (
     SiteConfig,
     get_retrieval_area,
 )
-from .data_retrieve import model_level_paths
+from .data_retrieve import model_level_paths, split_dates
 from .operations import compute_thetav
 
 
@@ -147,6 +147,69 @@ def standardize_surface_varnames(ds: xr.Dataset) -> xr.Dataset:
 
     return ds.rename(rename_dict)
 
+def site_folder_name(site: SiteConfig) -> str:
+    """'MaceHead' from the file name 'MaceHead_lvls.grib'."""
+    return site.model_level_filename.split("_lvls")[0]
+
+def site_piece_path(site: SiteConfig, piece: str, data_dir: str | Path) -> Path:
+    """
+    Path of ONE piece of one site, cut out of the file of its retrieval area, e.g.
+    data_dir/raw_lvls_data/MaceHead/MaceHead_lvls_20200101-20200115.grib
+    """
+    folder = site_folder_name(site)
+    name = f"{folder}_lvls_{piece.replace('-', '').replace('/', '-')}.grib"
+    return Path(data_dir) / "raw_lvls_data" / folder / name
+
+def site_piece_paths(site: SiteConfig, dates: str, data_dir: str | Path) -> list[Path]:
+    """Paths of all the pieces of one site (one per piece of data_retrieve.split_dates)."""
+    return [site_piece_path(site, piece, data_dir) for piece in split_dates(dates)]
+
+def extract_sites_from_file(
+    area_path: str | Path,
+    area_name: str,
+    piece: str,
+    site_configs: dict,
+    data_dir: str | Path,
+    delete_area_file: bool = False,
+    max_workers: int = 4,
+) -> list[Path]:
+    """
+    Cuts out of ONE downloaded file (one retrieval area, one piece of dates) the grid point(s) of every selected
+    site that lies in that area, via CDO. Called by scripts/download_era5.py right after each download:
+    with delete_area_file the big file is removed as soon as the sites are extracted, so that the whole download
+    needs little disk (only the sites are kept).
+    """
+    area_path = Path(area_path)
+    sites = {name: site for name, site in site_configs.items() if get_retrieval_area(site) == area_name}
+    area_box = [float(x) for x in ERA5_RETRIEVAL_AREAS[area_name].split("/")]
+
+    def extract_site(item):
+        name, site = item
+        site_path = site_piece_path(site, piece, data_dir)
+        site_path.parent.mkdir(parents=True, exist_ok=True)
+        if site_path.exists():
+            return site_path
+        tmp_path = site_path.with_name(site_path.name + ".part")
+        if [float(x) for x in site.area.split("/")] == area_box:
+            # The area is the site itself: nothing to select (and CDO cannot select from a single grid point)
+            shutil.copy(area_path, tmp_path)
+        else:
+            # CDO wants lon1,lon2,lat1,lat2. The small margin keeps the grid points on the edge of the box
+            north, west, south, east = (float(x) for x in site.area.split("/"))
+            box = f"{west - 0.01},{east + 0.01},{south - 0.01},{north + 0.01}"
+            cmd = f'cdo -s sellonlatbox,{box} "{area_path}" "{tmp_path}"'
+            subprocess.run(cmd, shell=True, check=True)
+        tmp_path.replace(site_path)
+        return site_path
+
+    print(f"Extracting {len(sites)} sites from {area_path.name}: {', '.join(sites)}")
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        site_paths = list(executor.map(extract_site, sites.items()))
+
+    if delete_area_file:
+        area_path.unlink()
+    return site_paths
+
 def extract_site_data(
     site: SiteConfig,
     dates: str,
@@ -155,50 +218,32 @@ def extract_site_data(
     max_workers: int = 4,
 ) -> None:
     """
-    Extracts the grid point(s) of one site (site.area) from the model level files of the retrieval area that
-    contains it (downloaded with data_retrieve.parallel_retrieval), and merges them in time via CDO.
-    The result is one GRIB file for the whole period, as if site.area had been requested directly.
-    The files of the area are big, so max_workers of them are processed at the same time.
+    Merges in time (CDO mergetime) the pieces of one site, into one GRIB file for the whole period, as if
+    site.area had been requested directly from the CDS. The pieces that are not there yet are cut out of the
+    files of the retrieval area (extract_sites_from_file), so this also works if the area files were downloaded
+    without extracting the sites along the way.
     """
     area_name = get_retrieval_area(site)
     area_paths = model_level_paths(area_name, dates, data_dir)
+    site_paths = site_piece_paths(site, dates, data_dir)
 
-    # All the pieces must be there, otherwise the merged file would have gaps in time
-    missing = [path.name for path in area_paths if not path.exists()]
-    if missing:
-        raise FileNotFoundError(
-            f"{len(missing)} of the {len(area_paths)} model level files of area {area_name} are missing in "
-            f"{area_paths[0].parent} (retrieve them first, and note that the dates must cover whole months): {missing}"
-        )
+    # Cut out the pieces that are missing (nothing to do if they were already extracted after each download)
+    for area_path, site_path, piece in zip(area_paths, site_paths, split_dates(dates)):
+        if site_path.exists():
+            continue
+        if not area_path.exists():
+            raise FileNotFoundError(
+                f"Neither the piece {site_path.name} nor the file {area_path.name} of the area {area_name} is "
+                f"there: retrieve it first (and note that the dates must cover whole months)."
+            )
+        extract_sites_from_file(area_path, area_name, piece, {site_folder_name(site): site}, data_dir,
+                                max_workers=max_workers)
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    site_box = [float(x) for x in site.area.split("/")]
-    area_box = [float(x) for x in ERA5_RETRIEVAL_AREAS[area_name].split("/")]
-
-    with tempfile.TemporaryDirectory(dir=output_path.parent) as tmp_dir:
-        if site_box == area_box:
-            # The area is the site itself: nothing to select (and CDO cannot select from a single grid point)
-            site_paths = area_paths
-        else:
-            # Select the site in every file first (small files), then merge them: the big files are never merged.
-            # CDO wants lon1,lon2,lat1,lat2. The small margin makes sure that grid points on the edge of the box are kept
-            north, west, south, east = site_box
-            box = f"{west - 0.01},{east + 0.01},{south - 0.01},{north + 0.01}"
-            print(f"Executing on {len(area_paths)} files of area {area_name}: cdo sellonlatbox,{box}")
-
-            def select_site(area_path):
-                site_path = Path(tmp_dir) / area_path.name
-                cmd = f'cdo -s sellonlatbox,{box} "{area_path}" "{site_path}"'
-                subprocess.run(cmd, shell=True, check=True)
-                return site_path
-
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                site_paths = list(executor.map(select_site, area_paths))
-
-        cmd = "cdo -O mergetime " + " ".join(f'"{path}"' for path in site_paths) + f' "{output_path}"'
-        print(f"Executing: cdo -O mergetime [{len(site_paths)} files of {area_name}] \"{output_path}\"")
-        subprocess.run(cmd, shell=True, check=True)
+    cmd = "cdo -O mergetime " + " ".join(f'"{path}"' for path in site_paths) + f' "{output_path}"'
+    print(f"Executing: cdo -O mergetime [{len(site_paths)} pieces of {site_folder_name(site)}] \"{output_path}\"")
+    subprocess.run(cmd, shell=True, check=True)
 
 def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None) -> tuple[xr.Dataset, xr.Dataset]:
     """
