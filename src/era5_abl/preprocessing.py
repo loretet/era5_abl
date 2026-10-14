@@ -245,7 +245,7 @@ def extract_site_data(
     print(f"Executing: cdo -O mergetime [{len(site_paths)} pieces of {site_folder_name(site)}] \"{output_path}\"")
     subprocess.run(cmd, shell=True, check=True)
 
-def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None) -> tuple[xr.Dataset, xr.Dataset]:
+def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None, cdo_mean: bool = False) -> tuple[xr.Dataset, xr.Dataset]:
     """
     Spatially averages GRIB files via CDO (-f nc4), explicitly computes
     3D pressure p(t, k) and hydrostatic height z_agl(t, k) from hybrid coefficients,
@@ -261,7 +261,10 @@ def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None)
         (grib_ml_path, ml_nc_path),
         (grib_srf_path, srf_nc_path),
     ]:
-        cmd = f'cdo -f nc4 fldmean "{grib_path}" "{nc_path}"'
+        if cdo_mean:
+            cmd = f'cdo -f nc4 fldmean "{grib_path}" "{nc_path}"'
+        else:
+            cmd = f'cdo -f nc4 copy "{grib_path}" "{nc_path}"'
         print(f"Executing: {cmd}")
         subprocess.run(cmd, shell=True, check=True)
 
