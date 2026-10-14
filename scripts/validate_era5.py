@@ -22,7 +22,7 @@ DATA_DIR = Path(os.environ.get(
 ))
 # Period that the files are expected to cover (same as DATES in download_era5.py):
 START = datetime(2020, 1, 1, 0)
-END = datetime(2020, 12, 31, 23)
+END = datetime(2021, 12, 31, 23)
 # Locations from the SITE_CONFIGS dictionary (same as download_era5.py):
 SELECTED_LOCATIONS = [
     "Cabauw",
