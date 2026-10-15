@@ -1,6 +1,6 @@
 import xarray as xr
 import numpy as np
-import os, shutil, subprocess
+import os, shutil, subprocess, tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from .config import (
@@ -11,6 +11,7 @@ from .config import (
     get_retrieval_area,
 )
 from .data_retrieve import model_level_paths, split_dates
+from .gribpoint import NotAPointFile, RepeatedHours, read_point_grib
 from .operations import compute_thetav
 
 
@@ -245,32 +246,93 @@ def extract_site_data(
     print(f"Executing: cdo -O mergetime [{len(site_paths)} pieces of {site_folder_name(site)}] \"{output_path}\"")
     subprocess.run(cmd, shell=True, check=True)
 
-def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None, cdo_mean: bool = False) -> tuple[xr.Dataset, xr.Dataset]:
+def load_with_cdo(grib_path: str | Path, cdo_mean: bool = False) -> xr.Dataset:
     """
-    Spatially averages GRIB files via CDO (-f nc4), explicitly computes
-    3D pressure p(t, k) and hydrostatic height z_agl(t, k) from hybrid coefficients,
-    derives theta_v, and reverses the vertical axis so k=0 is the surface.
+    Converts a GRIB file with CDO (-f nc4 copy, or fldmean) and returns it as a Dataset held in MEMORY.
+    CDO writes to a private temporary folder that is removed in every case, even after an error: nothing is left
+    on disk, no file handle stays open, and two runs can never meet on the same file (the cause of the
+    "permission denied" / 0 B _CDO_processed_tmp.nc of earlier versions).
+    """
+    operator = "fldmean" if cdo_mean else "copy"
+    with tempfile.TemporaryDirectory(prefix="era5_abl_cdo_") as tmp_dir:
+        nc_path = Path(tmp_dir) / (Path(grib_path).stem + ".nc")
+        cmd = ["cdo", "-f", "nc4", operator, str(grib_path), str(nc_path)]
+        print("Executing:", " ".join(cmd), flush=True)
+        try:
+            subprocess.run(cmd, check=True)
+        except FileNotFoundError as error:
+            raise RuntimeError("CDO was not found: install it (e.g. `conda install -c conda-forge cdo`) "
+                               "and make sure `cdo` is on the PATH.") from error
+        with xr.open_dataset(nc_path, engine="netcdf4") as ds:
+            return ds.load()
+
+
+def load_model_levels(grib_ml_path: str | Path, cdo_mean: bool = False, fast: bool = True) -> xr.Dataset:
+    """
+    The model level file as a Dataset (t, q, u, v on 'lev', the hybrid coefficients, time).
+    The files of single sites (the usual case) are read directly from the GRIB messages (gribpoint.py: ~10
+    seconds instead of 20-30 minutes in CDO, identical values). Anything else, e.g. a file with several grid
+    points that must be averaged (cdo_mean), goes through CDO.
+    """
+    if fast and not cdo_mean:
+        try:
+            ds = read_point_grib(grib_ml_path)
+            print(f"Read {Path(grib_ml_path).name} directly ({ds.sizes['time']} hours), without CDO.", flush=True)
+            return ds
+        except NotAPointFile as error:
+            print(f"{error}\n--> Using CDO instead (slower).", flush=True)
+    return load_with_cdo(grib_ml_path, cdo_mean)
+
+
+def check_time_axes(ds_ml: xr.Dataset, ds_srf: xr.Dataset, ml_path, srf_path) -> None:
+    """
+    Stops, with an explanation, if the level and surface data are not for exactly the same hours: the pressure
+    and height are computed hour by hour from both, so they must line up.
+    """
+    problems = []
+    def hours(ds):
+        return ds["time" if "time" in ds.coords else "valid_time"].to_index()
+
+    for label, ds, path in (("level", ds_ml, ml_path), ("surface", ds_srf, srf_path)):
+        index = hours(ds)
+        repeated = index[index.duplicated()].unique()
+        if len(repeated):
+            shown = ", ".join(f"{t:%Y-%m-%d %H:%M}" for t in repeated[:5])
+            problems.append(f"the {label} file {Path(path).name} has {len(repeated)} hour(s) more than once "
+                            f"({shown}{', ...' if len(repeated) > 5 else ''}): run scripts/fix_repeated_hours.py")
+        elif not index.is_monotonic_increasing:
+            problems.append(f"the hours of the {label} file {Path(path).name} are not in time order")
+    if not problems:
+        t_ml, t_srf = hours(ds_ml), hours(ds_srf)
+        only_ml, only_srf = t_ml.difference(t_srf), t_srf.difference(t_ml)
+        if len(only_ml) or len(only_srf):
+            def span(index):
+                return f"{index.min():%Y-%m-%d %H:%M} to {index.max():%Y-%m-%d %H:%M}" if len(index) else "none"
+            problems.append(
+                f"the level file ({len(t_ml)} hours, {span(t_ml)}) and the surface file ({len(t_srf)} hours, "
+                f"{span(t_srf)}) are not for the same hours: {len(only_ml)} hour(s) only in the level file "
+                f"({span(only_ml)}), {len(only_srf)} only in the surface file ({span(only_srf)}). "
+                f"Check that both were downloaded for the same dates."
+            )
+    if problems:
+        raise ValueError("Cannot combine the level and surface data:\n  - " + "\n  - ".join(problems))
+
+
+def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None, cdo_mean: bool = False,
+                    fast_reader: bool = True) -> tuple[xr.Dataset, xr.Dataset]:
+    """
+    Reads the model level and surface GRIB files (the model level file directly if it is a single site, see
+    load_model_levels; everything else through CDO), explicitly computes 3D pressure p(t, k) and hydrostatic
+    height z_agl(t, k) from hybrid coefficients, derives theta_v, and reverses the vertical axis so k=0 is
+    the surface.
+    fast_reader=False forces CDO for the level file (slow; only to compare with the direct reader).
     """
 
-    # Output paths
-    ml_nc_path = grib_ml_path.replace(".grib", "_CDO_processed_tmp.nc")
-    srf_nc_path = grib_srf_path.replace(".grib", "_CDO_processed_tmp.nc")
+    ds_ml = load_model_levels(grib_ml_path, cdo_mean=cdo_mean, fast=fast_reader)
+    ds_srf = load_with_cdo(grib_srf_path, cdo_mean=cdo_mean)
 
-    # Run CDO fldmean with explicit -f nc4 flag
-    for grib_path, nc_path in [
-        (grib_ml_path, ml_nc_path),
-        (grib_srf_path, srf_nc_path),
-    ]:
-        if cdo_mean:
-            cmd = f'cdo -f nc4 fldmean "{grib_path}" "{nc_path}"'
-        else:
-            cmd = f'cdo -f nc4 copy "{grib_path}" "{nc_path}"'
-        print(f"Executing: {cmd}")
-        subprocess.run(cmd, shell=True, check=True)
-
-    # Open spatially averaged NetCDF files
-    ds_ml = xr.open_dataset(ml_nc_path, engine="netcdf4")
-    ds_srf = xr.open_dataset(srf_nc_path, engine="netcdf4")
+    # The hours of both files must be the same, otherwise stop here with an explanation
+    check_time_axes(ds_ml, ds_srf, grib_ml_path, grib_srf_path)
 
     # Standardize dimension names
     dim_map = {}
@@ -326,7 +388,4 @@ def prepare_dataset(grib_ml_path: str, grib_srf_path: str, location: str = None,
         ds_ml.attrs["Location"] = location
         ds_srf.attrs["Location"] = location
 
-    # Remove the temporary CO processed files (in the main the user can decide whether to save them or not)
-    os.remove(srf_nc_path)
-    os.remove(ml_nc_path)
     return ds_ml, ds_srf
