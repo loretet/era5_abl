@@ -79,6 +79,15 @@ eabl.extract_site_data(SITE_CONFIGS["Mace Head"], dates="2020-01-01/2021-12-31",
 `parallel_retrieval` still downloads everything in one blocking go (used for the surface data), but for model
 levels the two steps above are the better route.
 
+### Checking the files
+
+`python scripts/validate_era5.py` reads the headers of every site file (seconds, not minutes) and checks that each
+hour of the period is there, **once**, in order and with all its fields. An hour that is present twice (it can
+happen when a download is interrupted and resumed, or run twice at the same time) makes CDO see extra time
+steps, so the level data no longer line up with the surface data and `prepare_dataset` stops. 
+`python scripts/fix_repeated_hours.py` removes the later copies and keeps every original as `<name>.orig`
+(`--dry-run` only reports).
+
 ## Basic usage
 
 ```python
@@ -109,6 +118,7 @@ from era5_abl.filters import filter_stability
 
 - `data_retrieve.py`: CDS requests (surface data per site, model level data per area and ~15 days).
 - `preprocessing.py`: extraction of the sites from the area files, file conversion, dataset preparation, variable names.
+- `gribpoint.py`: reads the single-site model level GRIB files directly (about 10 seconds instead of 20-30 minutes in CDO, identical values), finds and removes repeated hours.
 - `transfer_functions.py`: normalised transfer functions from Gryanik and Lüpkes 2018 paper.
 - `operations.py`: diagnosed BLH and BLH comparisons. Interpolation. Richardson number computation. PDFs and retention statistics. Some numerical diagnostics.
 - `filters.py`: cloud, stability, and wind-direction filters.
